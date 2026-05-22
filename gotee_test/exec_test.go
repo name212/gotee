@@ -35,7 +35,6 @@ func TestExec(t *testing.T) {
 		errStdoutWriter       = fmt.Errorf("errStdoutWriter")
 		errStdoutWriterSecond = fmt.Errorf("secondErrStdoutWriter")
 		errStderrWriter       = fmt.Errorf("errStderrWriter")
-		//errStderrWriterSecond = fmt.Errorf("secondErrStderrWriter")
 	)
 
 	stdOutOnlyTests := []testExec{
@@ -765,6 +764,11 @@ func (tt *testExec) run(t *testing.T) {
 		results, err := tee.RunCmd(t.Context(), cmd, opts...)
 
 		tt.assert(t, tt, results, err)
+
+		assertNoTeeGorutines(t, map[string]string{
+			"created by RunCmd": "created by github.com/name212/gotee.RunCmd",
+		})
+
 	})
 }
 
@@ -935,4 +939,3 @@ echo "Third string"
 echo "Error third" >&2
 `, seconds)
 }
-
