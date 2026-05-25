@@ -17,8 +17,13 @@ const (
 )
 
 var (
+	// ErrStopped
+	// Returns on double call Stream.Run
 	ErrStopped = fmt.Errorf("stream was stopped")
-	ErrClosed  = fmt.Errorf("already closed")
+	// ErrClosed
+	// spetial error for pass to stream that consumer
+	// does not need more data
+	ErrClosed = fmt.Errorf("already closed")
 )
 
 type (
@@ -28,17 +33,18 @@ type (
 
 // Consumer
 // Base interface to implement consumer
+// Should implements io.WriteCloser interface
 // Consumer should follow next rulles
 //   - Close method should safe to call multiple times
-//   - Close should not freeze, because Close calls not on gorutine
+//   - Close should not freeze, because Close calls not in gorutine
 //   - If consumer should not receive more data
 //     Write method should return ErrClosed error
+//     in this case Results will not have error for consumer
 //   - Write metod should copy received slice
 //     because it can be part of slice of another buffer
 //     or pulled from internal Pool
 //   - Write method should check that Consumer is closed
-//
-// /  if is closed should return 0, Err
+//     if is closed should return 0, ErrClosed
 type Consumer interface {
 	io.WriteCloser
 	// Name
@@ -49,20 +55,22 @@ type Consumer interface {
 }
 
 // Stream
-// Base interface to implement stream
+// Base interface to implement read bytes from io.Reader 
+// and pass potion of readed data to all passed Consumer
 type Stream interface {
 	// Run
 	// Start consume bytes from reader passed to stream
 	// If one of consumer or stream get read error
 	// returns not nil Results
 	// if all consumes were not return errors
-	// and was not got read error returns nil
-	// All consumers run in its own gorutine
+	// and was not got read error returns nil Results.
+	// All consumers run in its own gorutine.
 	// Also run operation send data potion over
-	// chan with buffer len returned from WritesBufferedCount
+	// chan with buffer len returned from WritesBufferedCount.
 	// Run wait when all data read from Reader or all consumers stopped
-	// or in error
+	// or in error.
 	Run(ctx context.Context) *Results
+
 	// WithBeforeStop
 	// All passed  BeforeStop functions will call
 	// before stop operations

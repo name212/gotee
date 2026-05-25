@@ -27,6 +27,8 @@ func (s *baseStream) isStopped() bool {
 	return s.stopped.IsClosed()
 }
 
+// WithName
+// Set Stream name for debug purposes
 func (s *baseStream) WithName(n string) {
 	s.name = n
 }
@@ -35,14 +37,20 @@ func (s *baseStream) GetName() string {
 	return s.name
 }
 
-func (s *baseStream) WithBufSize(size int) {
+// WithReadBufSize
+// Set internal read buffer size.
+// By default DefaultReadBufSize
+func (s *baseStream) WithReadBufSize(size int) {
 	if size > 0 {
 		s.bufSize = size
 	}
 }
 
+// WithBeforeStop
+// Append all paseed befor stop functions
+// to call on Stop
 func (s *baseStream) WithBeforeStop(bs ...BeforeStop) {
-	s.beforeStop = bs
+	s.beforeStop = append(s.beforeStop, bs...)
 }
 
 // WritesBufferedCount

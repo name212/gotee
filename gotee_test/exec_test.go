@@ -751,7 +751,7 @@ func (tt *testExec) run(t *testing.T) {
 		}
 
 		if tt.bufSize > 0 {
-			opts = append(opts, tee.RunCmdWithBufSize(tt.bufSize))
+			opts = append(opts, tee.RunCmdWithReadBufSize(tt.bufSize))
 		}
 
 		cmd := exec.Command(scriptPath, tt.scriptArgs...)

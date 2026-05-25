@@ -17,7 +17,12 @@ import (
 
 const maxConsecutiveEmptyReads = 100
 
+// TokenHandler
+// Handle each consumed token
 type TokenHandler interface {
+	// NewToken
+	// NonBlockScanner alls NewToken for each consumed token
+	// isLast is true if split function returns bufio.ErrFinalToken
 	NewToken(token []byte, isLast bool)
 }
 
@@ -25,15 +30,20 @@ var (
 	ErrAlreadyDone = fmt.Errorf("[github.com/name212/gotee/internal/Scanner] already done")
 )
 
+// NonBlockScanner
+// implement tokenizer without block
+// use bufio.SplitFunc for split tokens
+// with same bufio.SplitFunc contract
+// covered with test in ../gotee_test/scanner_test.go
 type NonBlockScanner struct {
-	split        bufio.SplitFunc // The function to split the tokens.
-	maxTokenSize int             // Maximum size of a token; modified by tests.
-	buf          []byte          // Buffer used as argument to split.
-	start        int             // First non-processed byte in buf.
-	end          int             // End of data in buf.
-	empties      int             // Count of successive empty tokens.
-	scanCalled   bool            // Scan has been called; buffer is in use.
-	done         bool            // Scan has finished.
+	split        bufio.SplitFunc
+	maxTokenSize int
+	buf          []byte
+	start        int
+	end          int
+	empties      int
+	scanCalled   bool
+	done         bool
 
 	handler TokenHandler
 }
@@ -60,6 +70,15 @@ func NewNonBlockScanner(handler TokenHandler) *NonBlockScanner {
 	}
 }
 
+// Scan
+// handle new consumed data and try tokenize all previous and 
+// consumed bytes to tokens
+// if token found call TokenHandler.NewToken method
+// Warning! TokenHandler.NewToken can call multiple times in one Scan
+// returns true if receive last token from split function with bufio.ErrFinalToken
+// if have maxConsecutiveEmptyReads tokens returns io.ErrNoProgress
+// Warning! because we do not know when read end, scanner can contains  
+// unhandled bytes. You can get it with Unhandled method
 func (s *NonBlockScanner) Scan(consumed []byte) (bool, error) {
 	if s.done {
 		return false, ErrAlreadyDone
@@ -131,6 +150,8 @@ func (s *NonBlockScanner) Scan(consumed []byte) (bool, error) {
 	return false, nil
 }
 
+// Unhandled
+// Returns not tokenized bytes
 func (s *NonBlockScanner) Unhandled() []byte {
 	if s.end == s.start || s.start > s.end {
 		return nil
@@ -139,6 +160,18 @@ func (s *NonBlockScanner) Unhandled() []byte {
 	return s.buf[s.start:s.end]
 }
 
+// Buffer controls memory allocation by the Scanner.
+// It sets the initial buffer to use when scanning
+// and the maximum size of buffer that may be allocated during scanning.
+// The contents of the buffer are ignored.
+//
+// The maximum token size must be less than the larger of max and cap(buf).
+// If max <= cap(buf), [Scanner.Scan] will use this buffer only and do no allocation.
+//
+// By default, [Scanner.Scan] uses an internal buffer and sets the
+// maximum token size to [MaxScanTokenSize].
+//
+// Buffer panics if it is called after scanning has started.
 func (s *NonBlockScanner) Buffer(buf []byte, max int) {
 	if s.scanCalled {
 		panic("Buffer called after Scan")
@@ -147,6 +180,10 @@ func (s *NonBlockScanner) Buffer(buf []byte, max int) {
 	s.maxTokenSize = max
 }
 
+// Split sets the split function for the [Scanner].
+// The default split function is [ScanLines].
+//
+// Split panics if it is called after scanning has started.
 func (s *NonBlockScanner) Split(split bufio.SplitFunc) {
 	if s.scanCalled {
 		panic("Split called after Scan")

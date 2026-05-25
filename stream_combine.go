@@ -13,6 +13,8 @@ import (
 
 var _ Stream = &CombineStream{}
 
+// CombineStream
+// combine all passed streams to one stream
 type CombineStream struct {
 	*baseStream
 	streams []Stream
@@ -29,6 +31,13 @@ func NewCombineStream(streams ...Stream) (*CombineStream, error) {
 	}, nil
 }
 
+// Run
+// implements Stream interface
+// Run run each Stream.Run in different gourutines
+// Results.ReadErr will have wrap all streams ReadErr in one error
+// Results.ConsumersErrs contains all errors from all consumes
+// for each Stream
+// if not receive read error and all consumers not have errors returns nil Results
 func (s *CombineStream) Run(ctx context.Context) *Results {
 	if s.isStopped() {
 		return newStoppedResults()
@@ -90,12 +99,19 @@ func (s *CombineStream) Run(ctx context.Context) *Results {
 	return nil
 }
 
+// Stop
+// Implements Stream.Stop interface.
+// Safe for call multiple times.
+// Runs all BeforeStop functions
+// and call Stream.Stop for each stream synchronously
 func (s *CombineStream) Stop() {
+	logger := s.createLogger("STOP")
+
 	if s.setStopped() {
+		logger.Log("Already stopped")
 		return
 	}
 
-	logger := s.createLogger("STOP")
 
 	s.runBeforeStop(logger)
 

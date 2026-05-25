@@ -14,6 +14,8 @@ import (
 
 var _ Stream = &TeeStream{}
 
+// TeeStream
+// Base implementation of Stream interface
 type TeeStream struct {
 	*baseStream
 
@@ -36,6 +38,15 @@ func NewTeeStream(input io.Reader, consumers ...Consumer) (*TeeStream, error) {
 	}, nil
 }
 
+// Run
+// implements Stream interface
+// Run run each consumer in different gourutines
+// Read data from reader until io.EOF or io.ErrClosedPipe error get
+// Also Run operation stops if all consumers stopped wit ErrClosed error
+// or all consumers returns errors
+// Results.ReadErr will have error from io.Reader exclude io.EOF or io.ErrClosedPipe
+// Results.ConsumersErrs contains all errors from all consumes
+// if not receive read error and all consumers not have errors returns nil Results
 func (s *TeeStream) Run(ctx context.Context) *Results {
 	if s.isStopped() {
 		return newStoppedResults()
@@ -196,6 +207,12 @@ OuterLoop:
 	return nil
 }
 
+// Stop
+// Stop read operation
+// Safe for multiple calls
+// Runs all VeforeStop funtions
+// And send stop signal to internal reader goroutine
+// without blocking
 func (s *TeeStream) Stop() {
 	logger := s.createLogger("STOP")
 

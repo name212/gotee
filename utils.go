@@ -11,6 +11,11 @@ import (
 	"time"
 )
 
+// ConsumerName
+// Returns joined strings of name 
+// or unique name for Consumer
+// If name is not passed use runtime.Caller
+// for extract filename and line and add rand number prefix
 func ConsumerName(deep int, name ...string) string {
 	if len(name) > 0 {
 		return strings.Join(name, " ")
@@ -32,6 +37,8 @@ func ConsumerName(deep int, name ...string) string {
 	return fmt.Sprintf("%d: %s:%d", randPrefix, f, line)
 }
 
+// CopyBytes
+// copy input to new byte slice
 func CopyBytes(input []byte) []byte {
 	res := make([]byte, len(input))
 	copy(res, input)
