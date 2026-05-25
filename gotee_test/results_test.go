@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestResultNilNotPanic(t *testing.T) {
+func TestResultsNilNotPanic(t *testing.T) {
 	type test struct {
 		name string
 		call func(t *testing.T)
@@ -62,7 +62,7 @@ func TestResultNilNotPanic(t *testing.T) {
 
 	for _, tst := range tests {
 		t.Run(tst.name, func(t *testing.T) {
-			require.NotPanics(t, func(){
+			require.NotPanics(t, func() {
 				tst.call(t)
 			}, "should not panics")
 		})
