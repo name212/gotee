@@ -10,16 +10,29 @@ type (
 	FuncNoErr func([]byte)
 )
 
+// FuncConsumer
+// Consummer wrapper around function
+// WARNING! By default consumer not copy input
+// For copy input before call function
+// use WithCopyInput(true) after create consumer
 type FuncConsumer struct {
 	*privateBaseConsumer
-	handler Func
 }
 
 func NewFuncConsumer(h Func, name ...string) *FuncConsumer {
-	return &FuncConsumer{
-		handler:             h,
-		privateBaseConsumer: newPrivateBaseConsumer(name...),
+	c := &FuncConsumer{}
+
+	handler := func(input []byte) (int, error) {
+		if err := h(input); err != nil {
+			return 0, err
+		}
+
+		return len(input), nil
 	}
+
+    c.privateBaseConsumer = newPrivateBaseConsumer(handler, name...)
+
+	return c
 }
 
 func NewFuncNoErrConsumer(h FuncNoErr, name ...string) *FuncConsumer {
@@ -33,20 +46,3 @@ func NewFuncNoErrConsumer(h FuncNoErr, name ...string) *FuncConsumer {
 	)
 }
 
-func (c *FuncConsumer) Write(p []byte) (int, error) {
-	if c.isClosed() {
-		return 0, ErrClosed
-	}
-
-	if err := c.handler(p); err != nil {
-		return 0, err
-	}
-
-	return len(p), nil
-}
-
-func (c *FuncConsumer) Close() error {
-	c.setClosed()
-
-	return nil
-}

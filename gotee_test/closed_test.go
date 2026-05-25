@@ -11,21 +11,37 @@ import (
 )
 
 func TestClosedFlag(t *testing.T) {
-	assertClosed(t, tee.NewClosedFlag())
+	flag := tee.NewClosedFlag()
+	closedCalls := 0
+
+	close := func() {
+		if flag.SetClosed() {
+			return
+		}
+		closedCalls++
+	}
+
+	assertClosed(t, flag, close, func() int {
+		return closedCalls
+	})
 }
 
-func assertClosed(t *testing.T, c closed) {
+func assertClosed(t *testing.T, c closed, close func(), closedCalls func() int) {
+	assertOneCloseCall := func(t *testing.T, msg string) {
+		require.Equal(t, 1, closedCalls(), "should one Close call: %s", msg)
+	}
+
 	beforeClose := c.IsClosed()
 	require.False(t, beforeClose, "should not closed before first SetClose")
 
-	firstStop := c.SetClosed()
-	require.False(t, firstStop, "first SetClosed should return that should close")
+	close()
+	assertOneCloseCall(t, "first SetClosed should return that should close")
 
 	afterClose := c.IsClosed()
 	require.True(t, afterClose, "should return closed after first SetClose")
 
-	secondStop := c.SetClosed()
-	require.True(t, secondStop, "second SetClosed should return that should not close")
+	close()
+	assertOneCloseCall(t, "second SetClosed should return that should not close")
 
 	afterSecondClose := c.IsClosed()
 	require.True(t, afterSecondClose, "should return closed after second SetClose")
@@ -33,5 +49,4 @@ func assertClosed(t *testing.T, c closed) {
 
 type closed interface {
 	IsClosed() bool
-	SetClosed() bool
 }

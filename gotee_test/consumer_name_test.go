@@ -130,6 +130,6 @@ func assertName(t *testing.T, name string, line int) {
 
 type testNameDummyPartsHandler struct{}
 
-func (h *testNameDummyPartsHandler) Handle(part []byte, last bool, scanErr bool) error {
+func (h *testNameDummyPartsHandler) Handle(part []byte, unhandled bool, last bool, scanErr bool) error {
 	return nil
 }

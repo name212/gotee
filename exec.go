@@ -153,7 +153,7 @@ func RunCmd(ctx context.Context, cmd *exec.Cmd, opts ...RunCmdOpt) (*Results, er
 
 func NewStreamForCmd(cmd *exec.Cmd, opts ...RunCmdOpt) (*CombineStream, CmdCleaner, error) {
 	optsToSet := &RunCmdOpts{
-		bufSize: DefaultBufSize,
+		bufSize: DefaultReadBufSize,
 	}
 
 	for _, o := range opts {

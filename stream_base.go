@@ -4,31 +4,22 @@
 package gotee
 
 import (
-	"fmt"
-
 	"github.com/name212/gotee/internal"
 )
 
-const (
-	DefaultBufSize = 16
-)
-
-var (
-	ErrStopped = fmt.Errorf("stream was stopped")
-	ErrClosed  = fmt.Errorf("already closed")
-)
-
 type baseStream struct {
-	stopped    *ClosedFlag
-	name       string
-	beforeStop []BeforeStop
+	stopped     *ClosedFlag
+	name        string
+	beforeStop  []BeforeStop
 	writesCount int
+	bufSize     int
 }
 
 func newBaseStream() *baseStream {
 	return &baseStream{
-		stopped: NewClosedFlag(),
+		stopped:     NewClosedFlag(),
 		writesCount: DefaultConsumerBufferedWrites,
+		bufSize:     DefaultReadBufSize,
 	}
 }
 
@@ -44,16 +35,25 @@ func (s *baseStream) GetName() string {
 	return s.name
 }
 
+func (s *baseStream) WithBufSize(size int) {
+	if size > 0 {
+		s.bufSize = size
+	}
+}
+
 func (s *baseStream) WithBeforeStop(bs ...BeforeStop) {
 	s.beforeStop = bs
 }
 
+// WritesBufferedCount
+// set chan buffer len for internal pipe
+// apply for all consumers pipes
+// if passed 0 value Stream will block in
+// every Write operation
 func (c *baseStream) WithWritesBufferedCount(n int) {
-	c.writesCount = n
-}
-
-func (c *baseStream) WritesBufferedCount() int {
-	return c.writesCount
+	if c.writesCount >= 0 {
+		c.writesCount = n
+	}
 }
 
 func (s *baseStream) setStopped() bool {

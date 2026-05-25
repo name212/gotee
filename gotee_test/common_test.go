@@ -42,17 +42,16 @@ type testWriteCloserConsumer struct {
 }
 
 func newTestWriteCloserConsumer(name string) *testWriteCloserConsumer {
-	return &testWriteCloserConsumer{
-		BaseConsumer: tee.NewBaseConsumer(name),
-		buf:          &bytes.Buffer{},
+	c := &testWriteCloserConsumer{
+		buf: &bytes.Buffer{},
 	}
+
+	c.BaseConsumer = tee.NewBaseConsumer(name, c.write, c.close)
+
+	return c
 }
 
-func (c *testWriteCloserConsumer) Write(p []byte) (int, error) {
-	if c.IsClosed() {
-		return 0, tee.ErrClosed
-	}
-
+func (c *testWriteCloserConsumer) write(p []byte) (int, error) {
 	c.checkErr(p)
 
 	if err := c.getWriteErr(); err != nil {
@@ -65,11 +64,7 @@ func (c *testWriteCloserConsumer) Write(p []byte) (int, error) {
 	return c.buf.Write(p)
 }
 
-func (c *testWriteCloserConsumer) Close() error {
-	if c.SetClosed() {
-		return nil
-	}
-
+func (c *testWriteCloserConsumer) close() error {
 	return c.getCloseErr()
 }
 
@@ -190,26 +185,25 @@ func enableDebugLogs(t *testing.T) {
 	t.Setenv("GO_TEE_DEBUG_LOG_FULL_BUFF", "true")
 }
 
-
 func assertNoTeeGorutines(t *testing.T, additionals map[string]string) {
 	t.Log("wait 100 ms before assert call stack...")
 	time.Sleep(100 * time.Millisecond)
 
 	runtime.Gosched()
 
-	buf := make([]byte, 128 * 1024)
+	buf := make([]byte, 128*1024)
 	n := runtime.Stack(buf, true)
 
 	bufStr := string(buf[:n])
 
 	contains := map[string]string{
-		"io wait": "[IO wait]",
-		"wait group": "[sync.WaitGroup.Wait]",
-		"pipe reader": "io.(*PipeReader)",
+		"io wait":                "[IO wait]",
+		"wait group":             "[sync.WaitGroup.Wait]",
+		"pipe reader":            "io.(*PipeReader)",
 		"created combine stream": "created by github.com/name212/gotee.(*CombineStream).Run",
-		"created by tee stream": "created by github.com/name212/gotee.(*TeeStream).Run",
-		"internal pipe": "github.com/name212/gotee.(*pipe)",
-		"not gotee": "github.com/name212/gotee.",
+		"created by tee stream":  "created by github.com/name212/gotee.(*TeeStream).Run",
+		"internal pipe":          "github.com/name212/gotee.(*pipe)",
+		"not gotee":              "github.com/name212/gotee.",
 	}
 
 	if len(additionals) > 0 {

@@ -13,6 +13,12 @@ import (
 
 const (
 	DefaultConsumerBufferedWrites = 100
+	DefaultReadBufSize            = 16
+)
+
+var (
+	ErrStopped = fmt.Errorf("stream was stopped")
+	ErrClosed  = fmt.Errorf("already closed")
 )
 
 type (
@@ -20,32 +26,100 @@ type (
 	BeforeStop      func()
 )
 
+// Consumer
+// Base interface to implement consumer
+// Consumer should follow next rulles
+//   - Close method should safe to call multiple times
+//   - Close should not freeze, because Close calls not on gorutine
+//   - If consumer should not receive more data
+//     Write method should return ErrClosed error
+//   - Write metod should copy received slice
+//     because it can be part of slice of another buffer
+//     or pulled from internal Pool
+//   - Write method should check that Consumer is closed
+//
+// /  if is closed should return 0, Err
 type Consumer interface {
 	io.WriteCloser
+	// Name
+	// returns unique name for consumer
+	// this string using for set error
+	// in Results for consumers
 	Name() string
 }
 
+// Stream
+// Base interface to implement stream
 type Stream interface {
+	// Run
+	// Start consume bytes from reader passed to stream
+	// If one of consumer or stream get read error
+	// returns not nil Results
+	// if all consumes were not return errors
+	// and was not got read error returns nil
+	// All consumers run in its own gorutine
+	// Also run operation send data potion over
+	// chan with buffer len returned from WritesBufferedCount
+	// Run wait when all data read from Reader or all consumers stopped
+	// or in error
 	Run(ctx context.Context) *Results
+	// WithBeforeStop
+	// All passed  BeforeStop functions will call
+	// before stop operations
+	// WARNING! each function run syncroniosly
+	// and can blok Stop operation
 	WithBeforeStop(...BeforeStop)
-	WritesBufferedCount() int
+
+	// Stop
+	// Can call if need stop consume operation
+	// during read
+	// Safe for multiple calls
 	Stop()
 }
 
+// Results
+// Struct for return errors got from consumers
+// or read operation
+// implemens error interface
 type Results struct {
-	ReadErr       error
+	ReadErr error
+	// ConsumersErrs
+	// errors got from consumers
+	// consumer name -> error
 	ConsumersErrs ConsumersErrors
 }
 
+// HasReadError
+// returns true if Run operation got read error
+// safe for call if Results is nil
 func (r *Results) HasReadError() bool {
-	return r.ReadErr != nil
+	if r == nil {
+		return false
+	}
+
+	return !internal.IsNil(r.ReadErr)
 }
 
+// HasConsumersErrors
+// returns true if Run operation got error from least one consumer
+// safe for call if Results is nil
 func (r *Results) HasConsumersErrors() bool {
+	if r == nil {
+		return false
+	}
+
 	return len(r.ConsumersErrs) > 0
 }
 
+// HasLeastOneError
+// returns true if Run operation got error from least one consumer
+// or read error
+// safe for call if Results is nil
 func (r *Results) HasLeastOneError() bool {
+	if r == nil {
+		return false
+	}
+
 	if r.HasReadError() {
 		return true
 	}
@@ -57,7 +131,15 @@ func (r *Results) HasLeastOneError() bool {
 	return false
 }
 
+// GetError
+// returns combine error for read and consumers errors
+// if Results is nil or not has any errors returns nil
+// safe for call if Results is nil
 func (r *Results) GetError() error {
+	if r == nil {
+		return nil
+	}
+
 	if !r.HasLeastOneError() {
 		return nil
 	}
@@ -80,7 +162,14 @@ func (r *Results) GetError() error {
 	return res
 }
 
+// Error
+// implements error interface
+// safe for call if Results is nil
 func (r *Results) Error() string {
+	if r == nil {
+		return ""
+	}
+
 	if err := r.GetError(); err != nil {
 		return err.Error()
 	}

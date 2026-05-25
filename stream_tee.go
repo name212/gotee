@@ -18,7 +18,6 @@ type TeeStream struct {
 	*baseStream
 
 	input     io.Reader
-	bufSize   int
 	consumers []Consumer
 
 	innerStopCh stopChan
@@ -34,16 +33,7 @@ func NewTeeStream(input io.Reader, consumers ...Consumer) (*TeeStream, error) {
 		input:       input,
 		consumers:   append([]Consumer{}, consumers...),
 		innerStopCh: make(stopChan, 1),
-		bufSize:     DefaultBufSize,
 	}, nil
-}
-
-func (s *TeeStream) WithBufSize(size int) *TeeStream {
-	if size > 0 {
-		s.bufSize = size
-	}
-
-	return s
 }
 
 func (s *TeeStream) Run(ctx context.Context) *Results {
@@ -62,7 +52,7 @@ func (s *TeeStream) Run(ctx context.Context) *Results {
 	// only in sendToAll that called from select
 	currentPipesForSend := make([]*pipe, 0, allPipesLen)
 
-	pipeWritesBufferedCount := s.WritesBufferedCount()
+	pipeWritesBufferedCount := s.writesCount
 
 	for _, c := range s.consumers {
 		p := newPipe(c, pipeWritesBufferedCount)
@@ -79,7 +69,7 @@ func (s *TeeStream) Run(ctx context.Context) *Results {
 	// only in sendToAll that called from select
 	pipesForRemove := make(map[int]struct{}, allPipesLen)
 
-	sendToAll := func(b []byte) error {
+	sendToAll := func(b []byte) bool {
 		pipesCount := len(currentPipesForSend)
 
 		loggerSendAll.LogBuf(b, -1, "Send buf to current pipes %d", pipesCount)
@@ -136,10 +126,10 @@ func (s *TeeStream) Run(ctx context.Context) *Results {
 		}
 
 		if len(currentPipesForSend) == 0 {
-			return fmt.Errorf("all consumers have errors or stopped")
+			return true
 		}
 
-		return nil
+		return false
 	}
 
 	logger.Log("Start read")
@@ -166,8 +156,8 @@ OuterLoop:
 			break OuterLoop
 		case buf := <-outCh:
 			logger.LogBuf(buf, -1, "Got buf from outCh")
-			if err := sendToAll(buf); err != nil {
-				readErr = err
+			if allClosed := sendToAll(buf); allClosed {
+				logger.Log("All consumers are closed")
 				break OuterLoop
 			}
 		}

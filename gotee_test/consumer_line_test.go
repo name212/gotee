@@ -77,7 +77,8 @@ func TestLineConsumer(t *testing.T) {
 		}
 
 		err := c.Close()
-		require.NoError(t, err, "should closed")
+		require.NoError(t, err, "should closed without error")
+		require.True(t, c.IsClosed(), "should closed")
 
 		require.Len(t, lines, errStep, "should consume all before error")
 
@@ -117,7 +118,8 @@ func writeToLineConsumer(t *testing.T, c *gotee.SplitConsumer) {
 	}
 
 	err := c.Close()
-	require.NoError(t, err, "consumer should be closed")
+	require.NoError(t, err, "consumer should be closed without error")
+	require.True(t, c.IsClosed(), "consumer should be closed")
 }
 
 func assertLineConsumer(t *testing.T, lines []string) {
