@@ -61,9 +61,15 @@ func (p *pipe) WriteToPipe(buf []byte) (bool, error) {
 		return true, writeErr
 	}
 
-	p.writeCh <- buf
-
-	return false, nil
+	select {
+	case p.writeCh <- buf:
+		return false, nil
+	case <-p.endCh:
+		wErrAfterClose := p.getWriteErr()
+		p.createLogger(loggerTarget).Log("Got end write. Write err %v. Stop pipe", wErrAfterClose)
+		_ = p.Stop()
+		return true, wErrAfterClose
+	}
 }
 
 func (p *pipe) Start() {
@@ -95,6 +101,7 @@ func (p *pipe) Start() {
 			//   from Stream after stop Stream Read cycle.
 			//   This behavior cover rule "Close channel from writer only!"
 			// - WriteToPipe call check that pipe stopped or/and have write error
+			// - *** WriteToPipe have select for write to chan and endCh
 			// - * Now we have one implementation TeeStream for using pipes
 			//   When TeeStream got close flag or error, stream remove
 			//   this pipe from list for send.
@@ -291,6 +298,18 @@ func (p *pipe) Start() {
 			// In good situation we cannot have this, Also see * and ** rules above.
 			// But if we got it, we get write error from Stop call from Stream
 			// because it was already set in write cycle and we wait it in Stop
+			// Eight. when we have unbuffered writeCh and consumer normal closed
+			// with ErrClosed
+			// In this sitation we can have potential deadlock. We do not set
+			// write error in case when consumer returns ErrClosed and we exit 
+			// from read from writeCh cycle. But stream can send new potion.
+			// In this sitation WriteToPipe forever block on writeCh because
+			// we ended gourutine. In end of read from writeCh cycle we close 
+			// endCh. With rule *** we get or correct write or signal that
+			// read cycle ended. If cycle ended we Stop pipe and returns 
+			// that write ended. If we have parallel call Stop from Stream
+			// and WriteToPipe we got correct result error because Stop
+			// have mutex
 			logger.Log("Close endCh")
 			close(p.endCh)
 

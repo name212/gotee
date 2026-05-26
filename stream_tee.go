@@ -158,14 +158,22 @@ OuterLoop:
 			}
 			s.Stop()
 			break OuterLoop
-		case err := <-errCh:
+		case err, ok := <-errCh:
+			if !ok {
+				logger.Log("Err channel was closed")
+				break OuterLoop
+			}
 			logger.Log("Got read err: %v", err)
 			readErr = err
 			break OuterLoop
 		case <-stopCh:
 			logger.Log("Got stop")
 			break OuterLoop
-		case buf := <-outCh:
+		case buf, ok := <-outCh:
+			if !ok {
+				logger.Log("Out channel was closed")
+				break OuterLoop
+			}
 			logger.LogBuf(buf, -1, "Got buf from outCh")
 			if allClosed := sendToAll(buf); allClosed {
 				logger.Log("All consumers are closed")
@@ -229,6 +237,13 @@ func (s *TeeStream) Stop() {
 }
 
 func (s *TeeStream) startRead(outCh outChan, stopCh stopChan, errCh errChan) {
+	defer func() {
+		// close channels for prevent leak
+		close(outCh)
+		close(stopCh)
+		close(errCh)
+	}()
+
 	buf := make([]byte, s.bufSize)
 
 	sendStop := func() {
@@ -240,7 +255,7 @@ func (s *TeeStream) startRead(outCh outChan, stopCh stopChan, errCh errChan) {
 	for {
 		n, err := s.input.Read(buf)
 		if n > 0 {
-			logger.LogBuf(buf, n, "Receive buf")
+			logger.LogBuf(buf, n, "Receive buf, send to Run")
 			toSend := make([]byte, n)
 			copy(toSend, buf[:n])
 			outCh <- toSend

@@ -164,7 +164,7 @@ Third string
 					return cut, nil
 				})
 
-				second := newErrWriterConsumer(tst, "stdout_err_writer_second", "second", func(b []byte) ([]byte, error) {
+				second := newExecErrWriterConsumer(tst, "stdout_err_writer_second", "second", func(b []byte) ([]byte, error) {
 					cut := []byte("string")
 					if bytes.Contains(b, cut) {
 						t.Logf("Return error for second %v", errStdoutWriterSecond)
@@ -347,7 +347,7 @@ Error third
 			},
 
 			stderrConsumers: func(tst *testExec) []tee.Consumer {
-				errConsumer := newErrWriterConsumer(tst, "out_err_one_err_err_writer_err", "stderr_err", func(b []byte) ([]byte, error) {
+				errConsumer := newExecErrWriterConsumer(tst, "out_err_one_err_err_writer_err", "stderr_err", func(b []byte) ([]byte, error) {
 					cut := []byte(" first")
 					if bytes.Contains(b, cut) {
 						t.Logf("Return error %v", errStderrWriter)
@@ -509,7 +509,7 @@ Error third
 					return cut, nil
 				})
 
-				second := newErrWriterConsumer(tst, "stderr_err_writer_second", "second", func(b []byte) ([]byte, error) {
+				second := newExecErrWriterConsumer(tst, "stderr_err_writer_second", "second", func(b []byte) ([]byte, error) {
 					cut := []byte("or seco")
 					if bytes.Contains(b, cut) {
 						t.Logf("Return error for second %v", errStdoutWriterSecond)
@@ -802,7 +802,7 @@ func returnDefaultWriterConsumer(tst *testExec, name string) []tee.Consumer {
 	return []tee.Consumer{newWriterConsumer(tst, name, execTestDefaultWriterKey)}
 }
 
-func newErrWriterConsumer(tst *testExec, name, key string, checker func([]byte) ([]byte, error)) tee.Consumer {
+func newExecErrWriterConsumer(tst *testExec, name, key string, checker func([]byte) ([]byte, error)) tee.Consumer {
 	consumer := newTestWriteCloserConsumer(name)
 	consumer.setWriteErrChecker(checker)
 	tst.consumersData[key] = consumer
@@ -811,7 +811,7 @@ func newErrWriterConsumer(tst *testExec, name, key string, checker func([]byte) 
 }
 
 func returnDefaultErrWriterConsumer(tst *testExec, name string, checker func([]byte) ([]byte, error)) []tee.Consumer {
-	return []tee.Consumer{newErrWriterConsumer(tst, name, execTestDefaultWriterKey, checker)}
+	return []tee.Consumer{newExecErrWriterConsumer(tst, name, execTestDefaultWriterKey, checker)}
 }
 
 func assertDefaultBuffer(t *testing.T, tst *testExec, expected ...string) {

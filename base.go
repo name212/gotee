@@ -69,6 +69,7 @@ type Stream interface {
 	// chan with buffer len returned from WritesBufferedCount.
 	// Run wait when all data read from Reader or all consumers stopped
 	// or in error.
+	// Warning! run is block operation!
 	Run(ctx context.Context) *Results
 
 	// WithBeforeStop
