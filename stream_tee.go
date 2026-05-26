@@ -23,6 +23,9 @@ type TeeStream struct {
 	consumers []Consumer
 
 	innerStopCh stopChan
+	readEndCh   stopChan
+
+	maxEmptyReads int
 }
 
 func NewTeeStream(input io.Reader, consumers ...Consumer) (*TeeStream, error) {
@@ -31,11 +34,28 @@ func NewTeeStream(input io.Reader, consumers ...Consumer) (*TeeStream, error) {
 	}
 
 	return &TeeStream{
-		baseStream:  newBaseStream(),
-		input:       input,
-		consumers:   append([]Consumer{}, consumers...),
-		innerStopCh: make(stopChan, 1),
+		baseStream:    newBaseStream(),
+		input:         input,
+		consumers:     append([]Consumer{}, consumers...),
+		innerStopCh:   make(stopChan, 1),
+		readEndCh:     make(stopChan),
+		maxEmptyReads: DefaultMaxEmptyReads,
 	}, nil
+}
+
+// WithMaxEmptyReads
+// Set maximum available empty reads
+// No action after start Run
+func (s *TeeStream) WithMaxEmptyReads(n int) *TeeStream {
+	if s.started.IsClosed() {
+		return s
+	}
+
+	if n > 0 {
+		s.maxEmptyReads = n
+	}
+
+	return s
 }
 
 // Run
@@ -47,9 +67,14 @@ func NewTeeStream(input io.Reader, consumers ...Consumer) (*TeeStream, error) {
 // Results.ReadErr will have error from io.Reader exclude io.EOF or io.ErrClosedPipe
 // Results.ConsumersErrs contains all errors from all consumes
 // if not receive read error and all consumers not have errors returns nil Results
+// if max empty reads reached Run returns io.ErrNoProgress in Results.ReadErr
 func (s *TeeStream) Run(ctx context.Context) *Results {
 	if s.isStopped() {
 		return newStoppedResults()
+	}
+
+	if s.started.SetClosed() {
+		return newAlreadyStartedResults()
 	}
 
 	stopCh := make(stopChan, 2)
@@ -148,6 +173,7 @@ func (s *TeeStream) Run(ctx context.Context) *Results {
 	go s.startRead(outCh, stopCh, errCh)
 
 	var readErr error
+
 OuterLoop:
 	for {
 		select {
@@ -167,7 +193,20 @@ OuterLoop:
 			readErr = err
 			break OuterLoop
 		case <-stopCh:
-			logger.Log("Got stop")
+			logger.Log("Got stop from read")
+			break OuterLoop
+		// we handle innerStopCh in read cycle and here
+		// for next reason.
+		// we can have slow reader and we can block on io.Reader
+		// in this situation we do not exit from this cycle
+		// and Run blocks for unknown time after call Stop.
+		// Also we can have sitation in reader cycle.
+		// We have block channel for send to consumer
+		// if we receive innerStopCh we should return from
+		// read cycle as fast as possible for avoid leak
+		// goroutine
+		case <-s.innerStopCh:
+			logger.Log("Got stop signal in run handler")
 			break OuterLoop
 		case buf, ok := <-outCh:
 			if !ok {
@@ -188,7 +227,7 @@ OuterLoop:
 
 	for _, p := range allPipes {
 		consumerName := p.consumer.Name()
-		logger.Log("Close pipe pipe for '%s'...", consumerName)
+		logger.Log("Close pipe for '%s'...", consumerName)
 
 		if err := p.Stop(); err != nil {
 			consumersErrs[consumerName] = err
@@ -198,6 +237,7 @@ OuterLoop:
 
 	logger.Log("All pipes were closed. Send stop to reader cycle...")
 
+	// call stop here to prevent leak read gourutine
 	s.Stop()
 
 	r := &Results{
@@ -233,7 +273,18 @@ func (s *TeeStream) Stop() {
 
 	logger.Log("Send stop signal to reader cycle")
 
-	s.innerStopCh <- noVal
+	close(s.innerStopCh)
+}
+
+// WaitReadEnd
+// waiting wen read cycle was closed
+func (s *TeeStream) WaitReadEnd(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <- s.readEndCh:
+		return nil
+	}
 }
 
 func (s *TeeStream) startRead(outCh outChan, stopCh stopChan, errCh errChan) {
@@ -242,43 +293,77 @@ func (s *TeeStream) startRead(outCh outChan, stopCh stopChan, errCh errChan) {
 		close(outCh)
 		close(stopCh)
 		close(errCh)
+		close(s.readEndCh)
 	}()
 
-	buf := make([]byte, s.bufSize)
+	logger := s.createLogger("READ_CYCLE")
 
 	sendStop := func() {
 		stopCh <- noVal
 	}
 
-	logger := s.createLogger("READ_CYCLE")
+	buf := make([]byte, s.bufSize)
+	emptyReads := 0
+
+	sendPart := func(n int) (bool, error) {
+		if n <= 0 {
+			emptyReads++
+			if emptyReads >= s.maxEmptyReads {
+				logger.Log("Reached max empty read %d", s.maxEmptyReads)
+				return true, io.ErrNoProgress
+			}
+		}
+
+		emptyReads = 0
+
+		logger.LogBuf(buf, n, "Receive buf, send to Run")
+
+		toSend := make([]byte, n)
+		copy(toSend, buf[:n])
+
+		select {
+		case outCh <- toSend:
+			return false, nil
+		case <-s.innerStopCh:
+			logger.Log("Receive stop signal during send to outCh")
+			return true, nil
+		}
+	}
+
+	sendErr := func(err error) {
+		logger.Log("End read. Got error: %v", err)
+		errCh <- err
+	}
 
 	for {
 		n, err := s.input.Read(buf)
-		if n > 0 {
-			logger.LogBuf(buf, n, "Receive buf, send to Run")
-			toSend := make([]byte, n)
-			copy(toSend, buf[:n])
-			outCh <- toSend
+		exit, gotSendErr := sendPart(n)
+		if gotSendErr != nil {
+			sendErr(gotSendErr)
+			return
+		}
+
+		if exit {
+			sendStop()
+			return
 		}
 
 		if internal.IsNil(err) {
-			if s.isReceiveStop() {
-				logger.Log("Got stop signal. Send stop to Run")
-				sendStop()
-				return
+			if !s.isReceiveStop() {
+				logger.Log("Continue read...")
+				continue
 			}
 
-			logger.Log("Continue read...")
-
-			continue
+			logger.Log("Got stop signal. Send stop to Run")
+			sendStop()
+			return
 		}
 
 		if s.isEndRead(err) {
 			logger.Log("End read. Send stop to Run")
 			sendStop()
 		} else {
-			logger.Log("End read. Got error: %v", err)
-			errCh <- err
+			sendErr(err)
 		}
 
 		return

@@ -16,7 +16,7 @@ type Logger interface {
 
 func GetDebugLogger(targets ...string) Logger {
 	if e := os.Getenv("GO_TEE_ENABLE_DEBUG_LOG"); e == "" {
-		return &emptyLogger{}
+		return emptyLoggerInstance
 	}
 
 	logBuf := os.Getenv("GO_TEE_DEBUG_LOG_FULL_BUFF") != ""
@@ -25,6 +25,8 @@ func GetDebugLogger(targets ...string) Logger {
 }
 
 type emptyLogger struct{}
+
+var emptyLoggerInstance = &emptyLogger{}
 
 func (l *emptyLogger) Log(f string, args ...any) {}
 

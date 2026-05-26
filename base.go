@@ -12,14 +12,26 @@ import (
 )
 
 const (
+	// DefaultConsumerBufferedWrites
+	// Default count of non-blockin reads
 	DefaultConsumerBufferedWrites = 100
-	DefaultReadBufSize            = 16
+	// DefaultReadBufSize
+	// Default read buffersize
+	DefaultReadBufSize = 16
+	// DefaultMaxEmptyReads
+	// Count of available empty reads without errors
+	// If stream got this numbers empty reads Stream.Run
+	// returns io.ErrNoProgress to read error
+	DefaultMaxEmptyReads = 300
 )
 
 var (
+	// ErrStreamStopped
+	// Returns if Stream.Run is stopped
+	ErrStreamStopped = fmt.Errorf("stream was stopped")
 	// ErrStopped
 	// Returns on double call Stream.Run
-	ErrStopped = fmt.Errorf("stream was stopped")
+	ErrStreamAlreadyStarted = fmt.Errorf("stream already started")
 	// ErrClosed
 	// spetial error for pass to stream that consumer
 	// does not need more data
@@ -55,7 +67,7 @@ type Consumer interface {
 }
 
 // Stream
-// Base interface to implement read bytes from io.Reader 
+// Base interface to implement read bytes from io.Reader
 // and pass potion of readed data to all passed Consumer
 type Stream interface {
 	// Run
@@ -69,8 +81,17 @@ type Stream interface {
 	// chan with buffer len returned from WritesBufferedCount.
 	// Run wait when all data read from Reader or all consumers stopped
 	// or in error.
+	// Run can returns io.ErrNoProgress in Results.ReadErr
 	// Warning! run is block operation!
-	Run(ctx context.Context) *Results
+	// Warning! You should close reader for prevent leak internal read gourutine!
+	// You can pass close of reader to WithBeforeStop
+	// for bytes.Buffer we have ClosableReaderBuffer wrapper
+	// ClosableReaderBuffer can used in the next way:
+	// buf := &bytes.Buffer{}
+	// w := NewClosableReaderBuffer(buf)
+	// s := NewTeeStream(w, ...)
+	// s.WithBeforeStop(CloserBeforeStop(w))
+	Run(context.Context) *Results
 
 	// WithBeforeStop
 	// All passed  BeforeStop functions will call
@@ -84,6 +105,12 @@ type Stream interface {
 	// during read
 	// Safe for multiple calls
 	Stop()
+
+	// WaitReadEnd
+	// Util function for wait end internal read cycle
+	// In most cases should not used. For dubug and test purposes
+	// Safe for multiple calls
+	WaitReadEnd(context.Context) error
 }
 
 // Results
@@ -186,9 +213,29 @@ func (r *Results) Error() string {
 	return ""
 }
 
+// CloserBeforeStop
+// Wrap Closer.Close call to use pass to use WithBeforeStop
+// CloserBeforeStop handle panic with recover
+func CloserBeforeStop(c io.Closer) BeforeStop {
+	return func() {
+		defer func ()  {
+			recover()	
+		}()
+
+		_ = c.Close()
+	}
+}
+
 func newStoppedResults() *Results {
 	return &Results{
-		ReadErr:       ErrStopped,
+		ReadErr:       ErrStreamStopped,
+		ConsumersErrs: make(ConsumersErrors),
+	}
+}
+
+func newAlreadyStartedResults() *Results {
+	return &Results{
+		ReadErr:       ErrStreamAlreadyStarted,
 		ConsumersErrs: make(ConsumersErrors),
 	}
 }

@@ -121,6 +121,47 @@ func (s *CombineStream) Stop() {
 	}
 }
 
+// WaitReadEnd
+// waiting wen read cycle was closed
+func (s *CombineStream) WaitReadEnd(ctx context.Context) error {
+	var mu sync.Mutex
+	var resErr error
+	appendErr := func(indx int, err error) {
+		if internal.IsNil(err) {
+			return
+		}
+
+		mu.Lock()
+		defer mu.Unlock()
+		resErr = internal.AppendErr(resErr, fmt.Errorf("%d: %w", indx, err))
+	}
+
+	wg := sync.WaitGroup{}
+
+	for i, strm := range s.streams {
+		wg.Add(1)
+
+		go func (indx int, st Stream)  {
+			defer wg.Done()
+			appendErr(indx, st.WaitReadEnd(ctx))	
+		}(i, strm)
+	}
+
+	allDone := make(stopChan)
+
+	go func ()  {
+		wg.Wait()
+		close(allDone)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-allDone:
+		return resErr
+	}
+}
+
 func (s *CombineStream) createLogger(target string) internal.Logger {
 	return internal.GetDebugLogger("COMBINE_STREAM", s.GetName(), target)
 }
