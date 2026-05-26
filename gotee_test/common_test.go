@@ -148,6 +148,76 @@ func (c *testWriteCloser) Close() error {
 	return c.base.Close()
 }
 
+type testReader struct {
+	buf            *tee.ClosableReaderBuffer
+	sleepTime      time.Duration
+	maxReadSymbols int
+	failAfter      int
+	failErr        error
+	mu             sync.Mutex
+	readed         int
+}
+
+func newTestReader(content string) *testReader {
+	buf := bytes.NewBufferString(content)
+	return &testReader{
+		buf:            tee.NewClosableReaderBuffer(buf),
+		maxReadSymbols: -1,
+		failAfter:      -1,
+	}
+}
+
+func (r *testReader) withSleep(t time.Duration) *testReader {
+	r.sleepTime = t
+	return r
+}
+
+func (r *testReader) withMaxSymbols(s int) *testReader {
+	r.maxReadSymbols = s
+	return r
+}
+
+func (r *testReader) withFailAfter(a int, err error) *testReader {
+	r.failAfter = a
+	r.failErr = err
+	return r
+}
+
+func (r *testReader) Read(p []byte) (int, error) {
+	if r.sleepTime > 0 {
+		time.Sleep(r.sleepTime)
+	}
+
+	toRead := p
+
+	bufferChanged := false
+	if r.maxReadSymbols > 0 && len(p) < r.maxReadSymbols {
+		bufferChanged = true
+		toRead = make([]byte, r.maxReadSymbols)
+	}
+
+	n, err := r.buf.Read(toRead)
+	r.readed += n
+
+	if bufferChanged {
+		copy(p, toRead)
+	}
+
+	if err != nil {
+		return n, err
+	}
+
+	if r.failAfter >= 0 && r.readed >= r.failAfter {
+		return n, r.failErr
+	}
+
+	return n, nil
+}
+
+func (b *testReader) Close() error {
+	return b.buf.Close()
+}
+
 func randString(seed string) string {
 	n := rand.NewSource(time.Now().UnixNano()).Int63()
 

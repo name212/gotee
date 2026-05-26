@@ -282,7 +282,7 @@ func (s *TeeStream) WaitReadEnd(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <- s.readEndCh:
+	case <-s.readEndCh:
 		return nil
 	}
 }

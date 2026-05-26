@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTeeStreamInterrupt(t *testing.T) {
+func TestTeeStreamInterruptFromConsumer(t *testing.T) {
 	enableDebugLogs(t)
 	bufString := `First string
 Second String
@@ -93,20 +93,6 @@ Third string`
 		}
 
 		return consumers, consumersToAsserts, consumersErrs
-	}
-
-	addClosableBufferToStream := func(s *gotee.TeeStream, r io.Reader) {
-		bc, ok := r.(*gotee.ClosableReaderBuffer)
-		if ok {
-			s.WithBeforeStop(gotee.CloserBeforeStop(bc))
-		}
-	}
-
-	assertNoReadGourutine := func(t *testing.T, s *gotee.TeeStream) {
-		ctx, cancel := context.WithTimeout(context.TODO(), 5 * time.Second)
-		defer cancel()
-		err := s.WaitReadEnd(ctx)
-		require.NoError(t, err, "read gourutine should stop")
 	}
 
 	doAllInterruptedConsumers := func(t *testing.T, constructor streamConstructor) {
@@ -466,4 +452,53 @@ Third string`
 			doAllInterruptedConsumers(t, c.constructor)
 		})
 	}
+}
+
+func TestTeeStreamStop(t *testing.T) {
+	enableDebugLogs(t)
+	bufString := `First string
+Second String
+Third string`
+
+	t.Run("Stop stream before read all", func(t *testing.T) {
+		reader := newTestReader(bufString)
+		reader.withSleep(2 * time.Second)
+
+		c := newTestWriteCloserConsumer("not_full")
+
+		stream, err := gotee.NewTeeStream(reader, c)
+		require.NoError(t, err, "stream should created")
+		stream.WithName("rstop_before_read")
+		stream.WithReadBufSize(1)
+		addClosableBufferToStream(stream, reader)
+
+		go func() {
+			time.Sleep(2 * time.Second)
+			stream.Stop()
+		}()
+
+		res := stream.Run(context.TODO())
+		require.Nil(t, res, "results should nil")
+		assertNoReadGourutine(t, stream)
+		assertNoTeeGorutines(t, nil)
+	})
+
+}
+
+func addClosableBufferToStream(s *gotee.TeeStream, r io.Reader) {
+	bc, ok := r.(*gotee.ClosableReaderBuffer)
+	if ok {
+		s.WithBeforeStop(gotee.CloserBeforeStop(bc))
+	}
+}
+
+func assertNoReadGourutine(t *testing.T, s *gotee.TeeStream) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	defer cancel()
+	start := time.Now().UnixNano()
+	err := s.WaitReadEnd(ctx)
+	end := time.Now().UnixNano()
+	waitTime := end - start
+	t.Logf("WaitReadEnd time for %s: %s", s.GetName(), time.Duration(waitTime).String())
+	require.NoError(t, err, "read gourutine should stop")
 }
