@@ -391,6 +391,6 @@ func (s *TeeStream) isEndRead(err error) bool {
 	return false
 }
 
-func (p *TeeStream) createLogger(target string) internal.Logger {
-	return internal.GetDebugLogger("TEE_STREAM", p.GetName(), target)
+func (s *TeeStream) createLogger(target string) internal.Logger {
+	return internal.GetDebugLogger("TEE_STREAM", s.GetName(), target)
 }

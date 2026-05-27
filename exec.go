@@ -129,12 +129,12 @@ func RunCmdWithCloseWait(w time.Duration) RunCmdOpt {
 // Each stream use for stdout or stderr.
 // For comunicate with cmd NewStreamForCmd creates io.Pipe for stout and/or stderr
 // This not use cmd.Stdou/errPipe because it can returns ClosePipe error.
-// Also NewStreamForCmd creates internal CmdCleaner that added to 
+// Also NewStreamForCmd creates internal CmdCleaner that added to
 // OnBeforeStop functions for avoid forever block on read after stop programm
 // (remember, we are using io.Pipe for communicating with programm, see reason above).
 // You can add your own before cleanup functions.
 // NewStreamForCmd returns CmdCleaner for getting close errors from close communicating pipes.
-// For consume you should CombineStream.Run in gouritine and call cmd.Start and cmd.Wait 
+// For consume you should CombineStream.Run in gouritine and call cmd.Start and cmd.Wait
 // Do not forget call CombineStream.Stop after cmd.Wait for prevent block
 func NewStreamForCmd(cmd *exec.Cmd, opts ...RunCmdOpt) (*CombineStream, CmdCleaner, error) {
 	optsToSet := &RunCmdOpts{
@@ -238,7 +238,7 @@ func NewStreamForCmd(cmd *exec.Cmd, opts ...RunCmdOpt) (*CombineStream, CmdClean
 // RunCmd:
 // - calls CombineStream.Run in gourutine
 // - Start and Wait command run
-// - If Start returns error run CmdCleaner and return 
+// - If Start returns error run CmdCleaner and return
 // - If Wait returns error, save error
 // - calls CombineStream.Stop and wait returns result from CombineStream.Run gourutine
 // - run CmdCleaner with combine errors from cmd.Wait and run CmdCleaner
@@ -249,13 +249,13 @@ func NewStreamForCmd(cmd *exec.Cmd, opts ...RunCmdOpt) (*CombineStream, CmdClean
 // - ErrCleanAfterRun - CmdCleaner returned from NewStreamForCmd has error
 // RunCmd func covered with tests in ./gotee_test/exec_test.go
 func RunCmd(ctx context.Context, cmd *exec.Cmd, opts ...RunCmdOpt) (*Results, error) {
-	cloneOpts := make([]RunCmdOpt, len(opts))
-	copy(cloneOpts, opts)
-
 	runCmdAdditionalOptions := []RunCmdOpt{
 		RunCmdWithName(cmd.String()),
 		RunCmdWithCloseWait(200 * time.Millisecond),
 	}
+
+	cloneOpts := make([]RunCmdOpt, 0, len(opts)+len(runCmdAdditionalOptions))
+	cloneOpts = append(cloneOpts, opts...)
 
 	cloneOpts = append(cloneOpts, runCmdAdditionalOptions...)
 
@@ -301,4 +301,3 @@ func RunCmd(ctx context.Context, cmd *exec.Cmd, opts ...RunCmdOpt) (*Results, er
 
 	return results, resErr
 }
-

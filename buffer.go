@@ -25,7 +25,7 @@ func NewClosableReaderBuffer(buf *bytes.Buffer) *ClosableReaderBuffer {
 	}
 }
 
-func (b *ClosableReaderBuffer) Read(p []byte) (n int, err error) {
+func (b *ClosableReaderBuffer) Read(p []byte) (int, error) {
 	if b.closed.IsClosed() {
 		return 0, io.EOF
 	}

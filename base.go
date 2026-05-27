@@ -218,8 +218,8 @@ func (r *Results) Error() string {
 // CloserBeforeStop handle panic with recover
 func CloserBeforeStop(c io.Closer) BeforeStop {
 	return func() {
-		defer func ()  {
-			recover()	
+		defer func() {
+			_ = recover()
 		}()
 
 		_ = c.Close()

@@ -71,13 +71,13 @@ func NewNonBlockScanner(handler TokenHandler) *NonBlockScanner {
 }
 
 // Scan
-// handle new consumed data and try tokenize all previous and 
+// handle new consumed data and try tokenize all previous and
 // consumed bytes to tokens
 // if token found call TokenHandler.NewToken method
 // Warning! TokenHandler.NewToken can call multiple times in one Scan
 // returns true if receive last token from split function with bufio.ErrFinalToken
 // if have maxConsecutiveEmptyReads tokens returns io.ErrNoProgress
-// Warning! because we do not know when read end, scanner can contains  
+// Warning! because we do not know when read end, scanner can contains
 // unhandled bytes. You can get it with Unhandled method
 func (s *NonBlockScanner) Scan(consumed []byte) (bool, error) {
 	if s.done {

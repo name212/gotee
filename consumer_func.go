@@ -30,7 +30,7 @@ func NewFuncConsumer(h Func, name ...string) *FuncConsumer {
 		return len(input), nil
 	}
 
-    c.privateBaseConsumer = newPrivateBaseConsumer(handler, name...)
+	c.privateBaseConsumer = newPrivateBaseConsumer(handler, name...)
 
 	return c
 }
@@ -45,4 +45,3 @@ func NewFuncNoErrConsumer(h FuncNoErr, name ...string) *FuncConsumer {
 		nameForSet,
 	)
 }
-

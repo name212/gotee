@@ -122,7 +122,6 @@ func (c *readerWriterCleaner) GetError(noWait ...bool) error {
 	return c.err
 }
 
-
 func pipeClosed(err error) bool {
 	if errors.Is(err, io.ErrClosedPipe) {
 		return true

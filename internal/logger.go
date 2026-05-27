@@ -57,8 +57,6 @@ func (l *fmtLogger) LogBuf(buf []byte, consume int, f string, args ...any) {
 	res := fmt.Sprintf(f, args...)
 
 	if l.logFullBuff {
-		bufStr := string(buf)
-		bufStr = strings.ReplaceAll(bufStr, "\n", "\\n")
 		resF := "%s; Consume %d; buf len: %d; buf: %q"
 		l.printF(resF, res, consume, len(buf), buf[:consume])
 		return
@@ -90,7 +88,7 @@ func createPrefixForLogger(targets ...string) string {
 			}
 			resTargets = append(resTargets, fmt.Sprintf("[%s]", t))
 		}
-		pref = pref + strings.Join(resTargets, "")
+		pref += strings.Join(resTargets, "")
 	}
 
 	return pref + ": "
