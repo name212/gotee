@@ -60,7 +60,6 @@ func (s *CombineStream) Run(ctx context.Context) *Results {
 				results[indx].ReadErr = res.ReadErr
 				results[indx].ConsumersErrs = res.ConsumersErrs
 			}
-
 		}(i, curStream)
 	}
 
@@ -112,7 +111,6 @@ func (s *CombineStream) Stop() {
 		return
 	}
 
-
 	s.runBeforeStop(logger)
 
 	for indx, st := range s.streams {
@@ -141,15 +139,15 @@ func (s *CombineStream) WaitReadEnd(ctx context.Context) error {
 	for i, strm := range s.streams {
 		wg.Add(1)
 
-		go func (indx int, st Stream)  {
+		go func(indx int, st Stream) {
 			defer wg.Done()
-			appendErr(indx, st.WaitReadEnd(ctx))	
+			appendErr(indx, st.WaitReadEnd(ctx))
 		}(i, strm)
 	}
 
 	allDone := make(stopChan)
 
-	go func ()  {
+	go func() {
 		wg.Wait()
 		close(allDone)
 	}()
