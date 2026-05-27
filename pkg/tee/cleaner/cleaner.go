@@ -1,7 +1,7 @@
 // Copyright 2026
 // license that can be found in the LICENSE file.
 
-package gotee
+package cleaner
 
 import (
 	"errors"
@@ -9,45 +9,22 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"sync/atomic"
 	"time"
 
-	"github.com/name212/gotee/internal"
+	"github.com/name212/gotee/pkg/internal"
+	"github.com/name212/gotee/pkg/tee"
 )
 
-// ClosedFlag
-// Wrapper around atomic.Bool
-// for prevent multiple calls for operation
-type ClosedFlag struct {
-	closed atomic.Bool
-}
+type DummyWriteReaderCleaner struct{}
 
-func NewClosedFlag() *ClosedFlag {
-	return &ClosedFlag{}
-}
-
-func (c *ClosedFlag) IsClosed() bool {
-	return c.closed.Load()
-}
-
-// SerClosed
-// Set closed flag for true
-// and returns true if flag already set to closed
-func (c *ClosedFlag) SetClosed() bool {
-	shouldClose := c.closed.CompareAndSwap(false, true)
-	return !shouldClose
-}
-
-type noWriteReaderCleaner struct{}
-
-func (c *noWriteReaderCleaner) GetError(noWait ...bool) error {
+func (c *DummyWriteReaderCleaner) GetError(noWait ...bool) error {
 	return nil
 }
 
-type readerWriterCleaner struct {
-	errCh errChan
+type ReaderWriterCleaner struct {
+	errCh internal.ErrChan
 
-	*ClosedFlag
+	*tee.ClosedFlag
 	err error
 
 	readers map[string]io.Closer
@@ -56,22 +33,22 @@ type readerWriterCleaner struct {
 	closeReadersWait time.Duration
 }
 
-func newReaderWriterCleaner(closeReadersWait time.Duration) *readerWriterCleaner {
-	return &readerWriterCleaner{
+func NewReaderWriterCleaner(closeReadersWait time.Duration) *ReaderWriterCleaner {
+	return &ReaderWriterCleaner{
 		closeReadersWait: closeReadersWait,
-		ClosedFlag:       NewClosedFlag(),
-		errCh:            make(errChan, 1),
+		ClosedFlag:       tee.NewClosedFlag(),
+		errCh:            make(internal.ErrChan, 1),
 		readers:          make(map[string]io.Closer),
 		writers:          make(map[string]io.Closer),
 	}
 }
 
-func (c *readerWriterCleaner) append(name string, reader, writer io.Closer) {
+func (c *ReaderWriterCleaner) Append(name string, reader, writer io.Closer) {
 	c.readers[name] = reader
 	c.writers[name] = writer
 }
 
-func (c *readerWriterCleaner) close() {
+func (c *ReaderWriterCleaner) Close() {
 	if c.IsClosed() {
 		return
 	}
@@ -90,7 +67,7 @@ func (c *readerWriterCleaner) close() {
 	close(c.errCh)
 }
 
-func (c *readerWriterCleaner) closeOnly(tp string, closers map[string]io.Closer) error {
+func (c *ReaderWriterCleaner) closeOnly(tp string, closers map[string]io.Closer) error {
 	var resErr error
 	for name, closer := range closers {
 		if err := closer.Close(); err != nil {
@@ -103,7 +80,7 @@ func (c *readerWriterCleaner) closeOnly(tp string, closers map[string]io.Closer)
 	return resErr
 }
 
-func (c *readerWriterCleaner) GetError(noWait ...bool) error {
+func (c *ReaderWriterCleaner) GetError(noWait ...bool) error {
 	if c.IsClosed() {
 		return c.err
 	}

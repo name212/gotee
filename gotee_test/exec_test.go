@@ -13,7 +13,9 @@ import (
 	"sync"
 	"testing"
 
-	tee "github.com/name212/gotee"
+	"github.com/name212/gotee/pkg/tee"
+	"github.com/name212/gotee/pkg/tee/cmd"
+	"github.com/name212/gotee/pkg/tee/consumer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -627,7 +629,7 @@ func (s *testExecSuit) setHasSkipped() {
 
 func (s *testExecSuit) enableDebug(enable bool) {
 	if enable {
-		enableDebugLogs(s.root)
+		EnableDebugLogs(s.root)
 	}
 }
 
@@ -736,36 +738,36 @@ func (tt *testExec) run(t *testing.T) {
 			scriptName = strings.ReplaceAll(scriptName, toReplace, "_")
 		}
 
-		scriptPath := writeScript(t, scriptName, tt.script)
+		scriptPath := WriteScript(t, scriptName, tt.script)
 
 		tt.consumersData = make(map[string]any)
 
-		opts := make([]tee.RunCmdOpt, 0, 3)
+		opts := make([]cmd.RunCmdOpt, 0, 3)
 
 		if tt.stdoutConsumers != nil {
-			opts = append(opts, tee.RunCmdWithStdout(tt.stdoutConsumers(tt)...))
+			opts = append(opts, cmd.RunCmdWithStdout(tt.stdoutConsumers(tt)...))
 		}
 
 		if tt.stderrConsumers != nil {
-			opts = append(opts, tee.RunCmdWithStderr(tt.stderrConsumers(tt)...))
+			opts = append(opts, cmd.RunCmdWithStderr(tt.stderrConsumers(tt)...))
 		}
 
 		if tt.bufSize > 0 {
-			opts = append(opts, tee.RunCmdWithReadBufSize(tt.bufSize))
+			opts = append(opts, cmd.RunCmdWithReadBufSize(tt.bufSize))
 		}
 
-		cmd := exec.Command(scriptPath, tt.scriptArgs...)
+		execCmd := exec.Command(scriptPath, tt.scriptArgs...)
 		if tt.runInGorutine != nil {
 			go func() {
 				tt.runInGorutine(t, tt)
 			}()
 		}
 
-		results, err := tee.RunCmd(t.Context(), cmd, opts...)
+		results, err := cmd.RunCmd(t.Context(), execCmd, opts...)
 
 		tt.assert(t, tt, results, err)
 
-		assertNoTeeGorutines(t, map[string]string{
+		AssertNoTeeGorutines(t, map[string]string{
 			"created by RunCmd": "created by github.com/name212/gotee.RunCmd",
 		})
 
@@ -775,7 +777,7 @@ func (tt *testExec) run(t *testing.T) {
 func newBufConsumer(tst *testExec, name, bufKey string) tee.Consumer {
 	buf := &bytes.Buffer{}
 	tst.consumersData[bufKey] = buf
-	return tee.NewBufferConsumer(buf, name)
+	return consumer.NewBufferConsumer(buf, name)
 }
 
 func returnDefaultBufConsumer(tst *testExec, name string) []tee.Consumer {
@@ -783,9 +785,9 @@ func returnDefaultBufConsumer(tst *testExec, name string) []tee.Consumer {
 }
 
 func newLineConsumer(tst *testExec, name, handlerKey string) tee.Consumer {
-	lineHandler := tee.NewStringsSliceLineHandler()
+	lineHandler := consumer.NewStringsSliceLineHandler()
 	tst.consumersData[handlerKey] = lineHandler
-	return tee.NewLineConsumer(lineHandler, name)
+	return consumer.NewLineConsumer(lineHandler, name)
 }
 
 func returnDefaultLineConsumer(tst *testExec, name string) []tee.Consumer {
@@ -804,7 +806,7 @@ func returnDefaultWriterConsumer(tst *testExec, name string) []tee.Consumer {
 
 func newExecErrWriterConsumer(tst *testExec, name, key string, checker func([]byte) ([]byte, error)) tee.Consumer {
 	consumer := newTestWriteCloserConsumer(name)
-	consumer.setWriteErrChecker(checker)
+	consumer.SetWriteErrChecker(checker)
 	tst.consumersData[key] = consumer
 
 	return consumer
@@ -830,19 +832,19 @@ func assertDefaultWriterConsumer(t *testing.T, tst *testExec, expectedLines ...s
 }
 
 func assertWriterConsumer(t *testing.T, rawConsumer any, expected ...string) {
-	consumer, ok := rawConsumer.(*testWriteCloserConsumer)
+	consumer, ok := rawConsumer.(*TestWriteCloserConsumer)
 	require.True(t, ok, "should be testWriteCloserConsumer")
 
 	require.True(t, consumer.IsClosed(), "consumer should be closed")
 
 	testBuffer := &bytes.Buffer{}
-	testBuffer.WriteString(consumer.content())
+	testBuffer.WriteString(consumer.Content())
 
 	assertBuffer(t, testBuffer, expected...)
 }
 
 func assertStringLineHandler(t *testing.T, rawLine any, expectedLines ...string) {
-	handler, ok := rawLine.(*tee.StringsSliceLineHandler)
+	handler, ok := rawLine.(*consumer.StringsSliceLineHandler)
 	require.True(t, ok, "should be StringsSliceLineHandler")
 
 	consumedLines := handler.Lines()

@@ -8,16 +8,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/name212/gotee"
+	"github.com/name212/gotee/pkg/tee/consumer"
 	"github.com/stretchr/testify/require"
 )
 
 func TestLineConsumer(t *testing.T) {
-	enableDebugLogs(t)
+	EnableDebugLogs(t)
 
 	t.Run("own handler", func(t *testing.T) {
-		handler := gotee.NewStringsSliceLineHandler(5)
-		c := gotee.NewLineConsumer(handler, "slice_handler")
+		handler := consumer.NewStringsSliceLineHandler(5)
+		c := consumer.NewLineConsumer(handler, "slice_handler")
 		writeToLineConsumer(t, c)
 		assertLineConsumer(t, handler.Lines())
 	})
@@ -29,7 +29,7 @@ func TestLineConsumer(t *testing.T) {
 			return nil
 		}
 
-		c := gotee.NewLineConsumer(gotee.NewFuncLineHandler(handler), "func_handler")
+		c := consumer.NewLineConsumer(consumer.NewFuncLineHandler(handler), "func_handler")
 		writeToLineConsumer(t, c)
 		assertLineConsumer(t, lines)
 	})
@@ -51,7 +51,7 @@ func TestLineConsumer(t *testing.T) {
 			return nil
 		}
 
-		c := gotee.NewLineConsumer(gotee.NewFuncLineHandler(handler), "func_err_handler")
+		c := consumer.NewLineConsumer(consumer.NewFuncLineHandler(handler), "func_err_handler")
 
 		linesToWrite := []string{
 			"First\n",
@@ -93,13 +93,13 @@ func TestLineConsumer(t *testing.T) {
 			lines = append(lines, l)
 		}
 
-		c := gotee.NewLineConsumer(gotee.NewFuncNoErrLineHandler(handler), "func_no_err_handler")
+		c := consumer.NewLineConsumer(consumer.NewFuncNoErrLineHandler(handler), "func_no_err_handler")
 		writeToLineConsumer(t, c)
 		assertLineConsumer(t, lines)
 	})
 }
 
-func writeToLineConsumer(t *testing.T, c *gotee.SplitConsumer) {
+func writeToLineConsumer(t *testing.T, c *consumer.SplitConsumer) {
 	toWrite := []string{
 		"Fir",
 		"st",

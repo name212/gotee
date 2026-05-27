@@ -1,27 +1,28 @@
 // Copyright 2026
 // license that can be found in the LICENSE file.
 
-package gotee
+package stream
 
 import (
-	"github.com/name212/gotee/internal"
+	"github.com/name212/gotee/pkg/internal"
+	tee "github.com/name212/gotee/pkg/tee"
 )
 
 type baseStream struct {
-	stopped     *ClosedFlag
+	stopped     *tee.ClosedFlag
 	name        string
-	beforeStop  []BeforeStop
+	beforeStop  []tee.BeforeStop
 	writesCount int
 	bufSize     int
-	started     *ClosedFlag
+	started     *tee.ClosedFlag
 }
 
 func newBaseStream() *baseStream {
 	return &baseStream{
-		stopped:     NewClosedFlag(),
-		started:     NewClosedFlag(),
-		writesCount: DefaultConsumerBufferedWrites,
-		bufSize:     DefaultReadBufSize,
+		stopped:     tee.NewClosedFlag(),
+		started:     tee.NewClosedFlag(),
+		writesCount: tee.DefaultConsumerBufferedWrites,
+		bufSize:     tee.DefaultReadBufSize,
 	}
 }
 
@@ -62,7 +63,7 @@ func (s *baseStream) WithReadBufSize(size int) {
 // Append all paseed befor stop functions
 // to call on Stop
 // No action after start Run
-func (s *baseStream) WithBeforeStop(bs ...BeforeStop) {
+func (s *baseStream) WithBeforeStop(bs ...tee.BeforeStop) {
 	if s.started.IsClosed() {
 		return
 	}

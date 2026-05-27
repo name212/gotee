@@ -1,9 +1,11 @@
 // Copyright 2026
 // license that can be found in the LICENSE file.
 
-package gotee
+package consumer
 
-var _ Consumer = &FuncConsumer{}
+import tee "github.com/name212/gotee/pkg/tee"
+
+var _ tee.Consumer = &FuncConsumer{}
 
 type (
 	Func      func([]byte) error
@@ -36,7 +38,7 @@ func NewFuncConsumer(h Func, name ...string) *FuncConsumer {
 }
 
 func NewFuncNoErrConsumer(h FuncNoErr, name ...string) *FuncConsumer {
-	nameForSet := ConsumerName(1, name...)
+	nameForSet := tee.ConsumerName(1, name...)
 	return NewFuncConsumer(
 		func(b []byte) error {
 			h(b)

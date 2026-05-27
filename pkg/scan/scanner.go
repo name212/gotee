@@ -12,7 +12,7 @@ import (
 	"io"
 	"unicode/utf8"
 
-	"github.com/name212/gotee/internal"
+	"github.com/name212/gotee/pkg/internal"
 )
 
 const maxConsecutiveEmptyReads = 100

@@ -1,7 +1,7 @@
 // Copyright 2026
 // license that can be found in the LICENSE file.
 
-package gotee
+package cmd
 
 import (
 	"context"
@@ -10,7 +10,10 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/name212/gotee/internal"
+	"github.com/name212/gotee/pkg/internal"
+	"github.com/name212/gotee/pkg/tee"
+	"github.com/name212/gotee/pkg/tee/cleaner"
+	"github.com/name212/gotee/pkg/tee/stream"
 )
 
 // CmdCleaner
@@ -35,8 +38,8 @@ var (
 
 type (
 	RunCmdOpts struct {
-		stdoutConsumers []Consumer
-		stderrConsumers []Consumer
+		stdoutConsumers []tee.Consumer
+		stderrConsumers []tee.Consumer
 		bufSize         int
 		name            string
 		closeWait       *time.Duration
@@ -49,7 +52,7 @@ type (
 
 // RunCmdWithStdout
 // Create Option that provide consumers for handle stdout from command
-func RunCmdWithStdout(consumers ...Consumer) RunCmdOpt {
+func RunCmdWithStdout(consumers ...tee.Consumer) RunCmdOpt {
 	return func(o *RunCmdOpts) {
 		if len(consumers) == 0 {
 			return
@@ -61,7 +64,7 @@ func RunCmdWithStdout(consumers ...Consumer) RunCmdOpt {
 
 // RunCmdWithStderr
 // Create Option that provide consumers for handle stderr from command
-func RunCmdWithStderr(consumers ...Consumer) RunCmdOpt {
+func RunCmdWithStderr(consumers ...tee.Consumer) RunCmdOpt {
 	return func(o *RunCmdOpts) {
 		if len(consumers) == 0 {
 			return
@@ -136,9 +139,9 @@ func RunCmdWithCloseWait(w time.Duration) RunCmdOpt {
 // NewStreamForCmd returns CmdCleaner for getting close errors from close communicating pipes.
 // For consume you should CombineStream.Run in gouritine and call cmd.Start and cmd.Wait
 // Do not forget call CombineStream.Stop after cmd.Wait for prevent block
-func NewStreamForCmd(cmd *exec.Cmd, opts ...RunCmdOpt) (*CombineStream, CmdCleaner, error) {
+func NewStreamForCmd(cmd *exec.Cmd, opts ...RunCmdOpt) (*stream.CombineStream, CmdCleaner, error) {
 	optsToSet := &RunCmdOpts{
-		bufSize: DefaultReadBufSize,
+		bufSize: tee.DefaultReadBufSize,
 	}
 
 	for _, o := range opts {
@@ -149,7 +152,7 @@ func NewStreamForCmd(cmd *exec.Cmd, opts ...RunCmdOpt) (*CombineStream, CmdClean
 	stderrConsumers := optsToSet.stderrConsumers
 
 	if len(stdoutConsumers) == 0 && len(stderrConsumers) == 0 {
-		return nil, &noWriteReaderCleaner{}, fmt.Errorf("stdout and/or sterr consumers not passed")
+		return nil, &cleaner.DummyWriteReaderCleaner{}, fmt.Errorf("stdout and/or sterr consumers not passed")
 	}
 
 	closeWaitTime := time.Duration(0)
@@ -157,23 +160,23 @@ func NewStreamForCmd(cmd *exec.Cmd, opts ...RunCmdOpt) (*CombineStream, CmdClean
 		closeWaitTime = *optsToSet.closeWait
 	}
 
-	cleaner := newReaderWriterCleaner(closeWaitTime)
+	cleaner := cleaner.NewReaderWriterCleaner(closeWaitTime)
 
-	createErr := func(f string, args ...any) (*CombineStream, CmdCleaner, error) {
-		cleaner.close()
+	createErr := func(f string, args ...any) (*stream.CombineStream, CmdCleaner, error) {
+		cleaner.Close()
 		return nil, cleaner, fmt.Errorf(f, args...)
 	}
 
-	streams := make([]Stream, 0, 2)
+	streams := make([]tee.Stream, 0, 2)
 
 	createPipe := func(name string) (io.ReadCloser, io.WriteCloser) {
 		reader, writer := io.Pipe()
-		cleaner.append(name, reader, writer)
+		cleaner.Append(name, reader, writer)
 		return reader, writer
 	}
 
-	createTeeStream := func(r io.Reader, consumers []Consumer, name string) (*TeeStream, error) {
-		st, err := NewTeeStream(r, consumers...)
+	createTeeStream := func(r io.Reader, consumers []tee.Consumer, name string) (*stream.TeeStream, error) {
+		st, err := stream.NewTeeStream(r, consumers...)
 		if err != nil {
 			return nil, err
 		}
@@ -220,13 +223,13 @@ func NewStreamForCmd(cmd *exec.Cmd, opts ...RunCmdOpt) (*CombineStream, CmdClean
 		streams = append(streams, st)
 	}
 
-	combine, err := NewCombineStream(streams...)
+	combine, err := stream.NewCombineStream(streams...)
 	if err != nil {
 		return createErr("cannot create combine stream: %w", err)
 	}
 
 	combine.WithBeforeStop(func() {
-		cleaner.close()
+		cleaner.Close()
 	})
 
 	return combine, cleaner, nil
@@ -248,7 +251,7 @@ func NewStreamForCmd(cmd *exec.Cmd, opts ...RunCmdOpt) (*CombineStream, CmdClean
 // - ErrRunCmd - cmd.Start or cmd.Wait returns error
 // - ErrCleanAfterRun - CmdCleaner returned from NewStreamForCmd has error
 // RunCmd func covered with tests in ./gotee_test/exec_test.go
-func RunCmd(ctx context.Context, cmd *exec.Cmd, opts ...RunCmdOpt) (*Results, error) {
+func RunCmd(ctx context.Context, cmd *exec.Cmd, opts ...RunCmdOpt) (*tee.Results, error) {
 	runCmdAdditionalOptions := []RunCmdOpt{
 		RunCmdWithName(cmd.String()),
 		RunCmdWithCloseWait(200 * time.Millisecond),
@@ -264,7 +267,7 @@ func RunCmd(ctx context.Context, cmd *exec.Cmd, opts ...RunCmdOpt) (*Results, er
 		return nil, internal.ConcatErrs(ErrCreateStreamBeforeRun, err)
 	}
 
-	resCh := make(chan *Results, 1)
+	resCh := make(chan *tee.Results, 1)
 
 	go func() {
 		res := stream.Run(ctx)
@@ -272,7 +275,7 @@ func RunCmd(ctx context.Context, cmd *exec.Cmd, opts ...RunCmdOpt) (*Results, er
 		close(resCh)
 	}()
 
-	cleanupAndReturnErr := func(err error) (*Results, error) {
+	cleanupAndReturnErr := func(err error) (*tee.Results, error) {
 		stream.Stop()
 
 		if cleanerErr := cleaner.GetError(); cleanerErr != nil {

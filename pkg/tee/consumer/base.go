@@ -1,12 +1,13 @@
 // Copyright 2026
 // license that can be found in the LICENSE file.
 
-package gotee
+package consumer
 
 import (
 	"fmt"
 
-	"github.com/name212/gotee/internal"
+	"github.com/name212/gotee/pkg/internal"
+	tee "github.com/name212/gotee/pkg/tee"
 )
 
 type (
@@ -27,7 +28,7 @@ type (
 // Otherwise if passed closeOp, call this operation
 type BaseConsumer struct {
 	name      string
-	closed    *ClosedFlag
+	closed    *tee.ClosedFlag
 	copyInput bool
 	writeOp   ImplWriteFunc
 	closeOp   ImplCloseFunc
@@ -67,7 +68,7 @@ func NewBaseConsumer(name string, writeOp ImplWriteFunc, closeOp ...ImplCloseFun
 
 	return &BaseConsumer{
 		name:      name,
-		closed:    NewClosedFlag(),
+		closed:    tee.NewClosedFlag(),
 		copyInput: false,
 		writeOp:   writeOp,
 		closeOp:   cl,
@@ -90,11 +91,11 @@ func (c *BaseConsumer) WithCopyInput(f bool) {
 // Consumer Write implementation
 func (c *BaseConsumer) Write(input []byte) (int, error) {
 	if c.closed.IsClosed() {
-		return 0, ErrClosed
+		return 0, tee.ErrClosed
 	}
 
 	if c.copyInput {
-		input = CopyBytes(input)
+		input = tee.CopyBytes(input)
 	}
 
 	return c.writeOp(input)
@@ -121,7 +122,7 @@ type privateBaseConsumer struct {
 }
 
 func newPrivateBaseConsumer(writeOp ImplWriteFunc, name ...string) *privateBaseConsumer {
-	nameForSet := ConsumerName(2, name...)
+	nameForSet := tee.ConsumerName(2, name...)
 	return &privateBaseConsumer{
 		BaseConsumer: NewBaseConsumer(nameForSet, writeOp),
 	}

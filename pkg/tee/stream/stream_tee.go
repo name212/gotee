@@ -1,7 +1,7 @@
 // Copyright 2026
 // license that can be found in the LICENSE file.
 
-package gotee
+package stream
 
 import (
 	"context"
@@ -9,10 +9,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/name212/gotee/internal"
+	"github.com/name212/gotee/pkg/internal"
+	tee "github.com/name212/gotee/pkg/tee"
 )
 
-var _ Stream = &TeeStream{}
+var _ tee.Stream = &TeeStream{}
 
 // TeeStream
 // Base implementation of Stream interface
@@ -20,15 +21,15 @@ type TeeStream struct {
 	*baseStream
 
 	input     io.Reader
-	consumers []Consumer
+	consumers []tee.Consumer
 
-	innerStopCh stopChan
-	readEndCh   stopChan
+	innerStopCh internal.StopChan
+	readEndCh   internal.StopChan
 
 	maxEmptyReads int
 }
 
-func NewTeeStream(input io.Reader, consumers ...Consumer) (*TeeStream, error) {
+func NewTeeStream(input io.Reader, consumers ...tee.Consumer) (*TeeStream, error) {
 	if len(consumers) == 0 {
 		return nil, fmt.Errorf("empty consumers list")
 	}
@@ -36,10 +37,10 @@ func NewTeeStream(input io.Reader, consumers ...Consumer) (*TeeStream, error) {
 	return &TeeStream{
 		baseStream:    newBaseStream(),
 		input:         input,
-		consumers:     append([]Consumer{}, consumers...),
-		innerStopCh:   make(stopChan, 1),
-		readEndCh:     make(stopChan),
-		maxEmptyReads: DefaultMaxEmptyReads,
+		consumers:     append([]tee.Consumer{}, consumers...),
+		innerStopCh:   make(internal.StopChan, 1),
+		readEndCh:     make(internal.StopChan),
+		maxEmptyReads: tee.DefaultMaxEmptyReads,
 	}, nil
 }
 
@@ -68,7 +69,7 @@ func (s *TeeStream) WithMaxEmptyReads(n int) *TeeStream {
 // Results.ConsumersErrs contains all errors from all consumes
 // if not receive read error and all consumers not have errors returns nil Results
 // if max empty reads reached Run returns io.ErrNoProgress in Results.ReadErr
-func (s *TeeStream) Run(ctx context.Context) *Results {
+func (s *TeeStream) Run(ctx context.Context) *tee.Results {
 	if s.isStopped() {
 		return newStoppedResults()
 	}
@@ -77,9 +78,9 @@ func (s *TeeStream) Run(ctx context.Context) *Results {
 		return newAlreadyStartedResults()
 	}
 
-	stopCh := make(stopChan, 2)
-	errCh := make(errChan)
-	outCh := make(outChan)
+	stopCh := make(internal.StopChan, 2)
+	errCh := make(internal.ErrChan)
+	outCh := make(internal.OutChan)
 
 	allPipesLen := len(s.consumers)
 
@@ -223,7 +224,7 @@ OuterLoop:
 
 	logger.Log("End read. Stop pipes")
 
-	consumersErrs := make(ConsumersErrors)
+	consumersErrs := make(tee.ConsumersErrors)
 
 	for _, p := range allPipes {
 		consumerName := p.consumer.Name()
@@ -240,7 +241,7 @@ OuterLoop:
 	// call stop here to prevent leak read gourutine
 	s.Stop()
 
-	r := &Results{
+	r := &tee.Results{
 		ReadErr:       readErr,
 		ConsumersErrs: consumersErrs,
 	}
@@ -287,7 +288,7 @@ func (s *TeeStream) WaitReadEnd(ctx context.Context) error {
 	}
 }
 
-func (s *TeeStream) startRead(outCh outChan, stopCh stopChan, errCh errChan) {
+func (s *TeeStream) startRead(outCh internal.OutChan, stopCh internal.StopChan, errCh internal.ErrChan) {
 	defer func() {
 		// close channels for prevent leak
 		close(outCh)
@@ -299,7 +300,7 @@ func (s *TeeStream) startRead(outCh outChan, stopCh stopChan, errCh errChan) {
 	logger := s.createLogger("READ_CYCLE")
 
 	sendStop := func() {
-		stopCh <- noVal
+		stopCh <- internal.NoVal
 	}
 
 	buf := make([]byte, s.bufSize)

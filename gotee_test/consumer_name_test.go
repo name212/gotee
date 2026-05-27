@@ -9,40 +9,41 @@ import (
 	"regexp"
 	"testing"
 
-	tee "github.com/name212/gotee"
+	"github.com/name212/gotee/pkg/tee"
+	"github.com/name212/gotee/pkg/tee/consumer"
 	"github.com/stretchr/testify/require"
 )
 
 func TestConsumersDefaultName(t *testing.T) {
 	buf := bytes.Buffer{}
 
-	bufConsumer := tee.NewBufferConsumer(&buf)
+	bufConsumer := consumer.NewBufferConsumer(&buf)
 
-	funcConsumer := tee.NewFuncConsumer(
+	funcConsumer := consumer.NewFuncConsumer(
 		func(b []byte) error {
 			return nil
 		},
 	)
 
-	funcNoErrConsumer := tee.NewFuncNoErrConsumer(func(b []byte) {})
+	funcNoErrConsumer := consumer.NewFuncNoErrConsumer(func(b []byte) {})
 
-	lineHandlerConsumer := tee.NewLineConsumer(tee.NewStringsSliceLineHandler())
+	lineHandlerConsumer := consumer.NewLineConsumer(consumer.NewStringsSliceLineHandler())
 
-	lineFuncConsumer := tee.NewFuncLineConsumer(
+	lineFuncConsumer := consumer.NewFuncLineConsumer(
 		func(s string) error {
 			return nil
 		},
 	)
 
-	lineFuncNoErrConsumer := tee.NewFuncNoErrLineConsumer(func(s string) {})
+	lineFuncNoErrConsumer := consumer.NewFuncNoErrLineConsumer(func(s string) {})
 
-	wc := newTestWriteCloser()
+	wc := NewTestWriteCloser()
 
-	writeCloserConsumer := tee.NewWriteCloserConsumer(wc)
+	writeCloserConsumer := consumer.NewWriteCloserConsumer(wc)
 
-	writerConsumer := tee.NewWriterConsumer(wc)
+	writerConsumer := consumer.NewWriterConsumer(wc)
 
-	customLinesConsumer := tee.NewCustomLineConsumer(&testNameDummyPartsHandler{})
+	customLinesConsumer := consumer.NewCustomLineConsumer(&testNameDummyPartsHandler{})
 
 	consumers := []struct {
 		consumer tee.Consumer
@@ -52,55 +53,55 @@ func TestConsumersDefaultName(t *testing.T) {
 		{
 			name:     "BufferConsumer",
 			consumer: bufConsumer,
-			line:     19,
+			line:     20,
 		},
 
 		{
 			name:     "FuncConsumer",
 			consumer: funcConsumer,
-			line:     21,
+			line:     22,
 		},
 
 		{
 			name:     "FuncNoErrConsumer",
 			consumer: funcNoErrConsumer,
-			line:     27,
+			line:     28,
 		},
 
 		{
 			name:     "LineConsumer",
 			consumer: lineHandlerConsumer,
-			line:     29,
+			line:     30,
 		},
 
 		{
 			name:     "LineFuncConsumer",
 			consumer: lineFuncConsumer,
-			line:     31,
+			line:     32,
 		},
 
 		{
 			name:     "LineFuncNoErrConsumer",
 			consumer: lineFuncNoErrConsumer,
-			line:     37,
+			line:     38,
 		},
 
 		{
 			name:     "WriteCloserConsumer",
 			consumer: writeCloserConsumer,
-			line:     41,
+			line:     42,
 		},
 
 		{
 			name:     "WriterConsumer",
 			consumer: writerConsumer,
-			line:     43,
+			line:     44,
 		},
 
 		{
 			name:     "CustomLinesConsumer",
 			consumer: customLinesConsumer,
-			line:     45,
+			line:     46,
 		},
 	}
 

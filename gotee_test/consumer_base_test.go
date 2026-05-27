@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"testing"
 
-	tee "github.com/name212/gotee"
+	"github.com/name212/gotee/pkg/tee/consumer"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,7 +18,7 @@ func TestBaseConsumerClose(t *testing.T) {
 
 	closedCalls := 0
 
-	c := tee.NewBaseConsumer("name", writeOp, func() error {
+	c := consumer.NewBaseConsumer("name", writeOp, func() error {
 		closedCalls++
 		return nil
 	})
@@ -38,7 +38,7 @@ func TestBaseConsumerCopyInput(t *testing.T) {
 	assertCopy := func(t *testing.T, shouldCopy bool) {
 		input := []byte("a")
 		var got *[]byte
-		c := tee.NewBaseConsumer("copy test", func(b []byte) (int, error) {
+		c := consumer.NewBaseConsumer("copy test", func(b []byte) (int, error) {
 			got = &b
 			return len(b), nil
 		})
@@ -82,7 +82,7 @@ func TestBaseConsumerWrite(t *testing.T) {
 		err    error
 	}
 
-	createWriteOp := func(tst *test) tee.ImplWriteFunc {
+	createWriteOp := func(tst *test) consumer.ImplWriteFunc {
 		return func(b []byte) (int, error) {
 			tst.called = true
 			return tst.n, tst.err
@@ -105,7 +105,7 @@ func TestBaseConsumerWrite(t *testing.T) {
 
 	for _, tst := range tests {
 		t.Run(tst.name, func(t *testing.T) {
-			c := tee.NewBaseConsumer("write test", createWriteOp(tst))
+			c := consumer.NewBaseConsumer("write test", createWriteOp(tst))
 			n, err := c.Write([]byte("b"))
 
 			require.True(t, tst.called, "should call Write")
@@ -117,12 +117,12 @@ func TestBaseConsumerWrite(t *testing.T) {
 
 func TestBaseConsumerCloseCall(t *testing.T) {
 	type test struct {
-		name string
-		err  error
+		name   string
+		err    error
 		called bool
 	}
 
-	createCloseOp := func(tst *test) tee.ImplCloseFunc {
+	createCloseOp := func(tst *test) consumer.ImplCloseFunc {
 		return func() error {
 			tst.called = true
 			return tst.err
@@ -147,7 +147,7 @@ func TestBaseConsumerCloseCall(t *testing.T) {
 
 	for _, tst := range tests {
 		t.Run(tst.name, func(t *testing.T) {
-			c := tee.NewBaseConsumer("close test", writeOp, createCloseOp(tst))
+			c := consumer.NewBaseConsumer("close test", writeOp, createCloseOp(tst))
 			_, _ = c.Write([]byte("b"))
 
 			err := c.Close()
@@ -159,11 +159,11 @@ func TestBaseConsumerCloseCall(t *testing.T) {
 	}
 
 	t.Run("Close op not passsed not panics", func(t *testing.T) {
-		c := tee.NewBaseConsumer("close test", writeOp)
+		c := consumer.NewBaseConsumer("close test", writeOp)
 		_, _ = c.Write([]byte("b"))
 
 		var err error
-		closeFun := func ()  {
+		closeFun := func() {
 			err = c.Close()
 		}
 

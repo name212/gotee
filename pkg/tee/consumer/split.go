@@ -1,17 +1,18 @@
 // Copyright 2026
 // license that can be found in the LICENSE file.
 
-package gotee
+package consumer
 
 import (
 	"bufio"
 
-	"github.com/name212/gotee/internal"
-	"github.com/name212/gotee/scan"
+	"github.com/name212/gotee/pkg/internal"
+	"github.com/name212/gotee/pkg/scan"
+	tee "github.com/name212/gotee/pkg/tee"
 )
 
 var (
-	_ Consumer = &SplitConsumer{}
+	_ tee.Consumer = &SplitConsumer{}
 )
 
 // PartsHandler
@@ -42,7 +43,7 @@ type PartsHandler interface {
 type SplitConsumer struct {
 	*privateBaseConsumer
 
-	flushed *ClosedFlag
+	flushed *tee.ClosedFlag
 
 	scanner *scan.NonBlockScanner
 	handler *scannerHandler
@@ -61,7 +62,7 @@ func NewSplitConsumer(split bufio.SplitFunc, handler PartsHandler, name ...strin
 	c := &SplitConsumer{
 		scanner: scanner,
 		handler: tokenHandler,
-		flushed: NewClosedFlag(),
+		flushed: tee.NewClosedFlag(),
 	}
 
 	c.privateBaseConsumer = newPrivateBaseConsumer(c.write, name...).withClose(c.close)
@@ -84,7 +85,7 @@ func (c *SplitConsumer) write(input []byte) (int, error) {
 		if !hasScanErr {
 			l = len(input)
 		}
-		return l, internal.AppendErr(flushErr, ErrClosed)
+		return l, internal.AppendErr(flushErr, tee.ErrClosed)
 	}
 
 	return len(input), nil
@@ -98,7 +99,7 @@ func (c *SplitConsumer) flush(last bool, scanError bool) error {
 	unhandled := c.scanner.Unhandled()
 	if len(unhandled) > 0 {
 		const isUnhandled = true
-		return c.handler.partsHandler.Handle(CopyBytes(unhandled), isUnhandled, last, scanError)
+		return c.handler.partsHandler.Handle(tee.CopyBytes(unhandled), isUnhandled, last, scanError)
 	}
 
 	return nil
@@ -133,7 +134,7 @@ func (h *scannerHandler) NewToken(token []byte, isLast bool) {
 		scanError = false
 	)
 
-	if err := h.partsHandler.Handle(CopyBytes(token), unhandled, isLast, scanError); err != nil {
+	if err := h.partsHandler.Handle(tee.CopyBytes(token), unhandled, isLast, scanError); err != nil {
 		h.err = err
 	}
 }

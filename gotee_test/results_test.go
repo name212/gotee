@@ -6,7 +6,7 @@ package gotee_test
 import (
 	"testing"
 
-	"github.com/name212/gotee"
+	"github.com/name212/gotee/pkg/tee"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,7 +16,7 @@ func TestResultsNilNotPanic(t *testing.T) {
 		call func(t *testing.T)
 	}
 
-	var nilResults *gotee.Results
+	var nilResults *tee.Results
 
 	tests := []test{
 		{
