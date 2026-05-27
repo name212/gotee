@@ -29,4 +29,3 @@ func (c *ClosedFlag) SetClosed() bool {
 	shouldClose := c.closed.CompareAndSwap(false, true)
 	return !shouldClose
 }
-

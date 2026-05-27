@@ -10,10 +10,10 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/name212/gotee/pkg/tee/cleaner"
 	"github.com/name212/gotee/pkg/internal"
-	"github.com/name212/gotee/pkg/tee/stream"
 	"github.com/name212/gotee/pkg/tee"
+	"github.com/name212/gotee/pkg/tee/cleaner"
+	"github.com/name212/gotee/pkg/tee/stream"
 )
 
 // CmdCleaner
