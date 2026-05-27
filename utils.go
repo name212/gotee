@@ -12,7 +12,7 @@ import (
 )
 
 // ConsumerName
-// Returns joined strings of name 
+// Returns joined strings of name
 // or unique name for Consumer
 // If name is not passed use runtime.Caller
 // for extract filename and line and add rand number prefix

@@ -59,9 +59,9 @@ func NewSplitConsumer(split bufio.SplitFunc, handler PartsHandler, name ...strin
 	scanner.Split(split)
 
 	c := &SplitConsumer{
-		scanner:             scanner,
-		handler:             tokenHandler,
-		flushed:             NewClosedFlag(),
+		scanner: scanner,
+		handler: tokenHandler,
+		flushed: NewClosedFlag(),
 	}
 
 	c.privateBaseConsumer = newPrivateBaseConsumer(c.write, name...).withClose(c.close)
@@ -106,7 +106,7 @@ func (c *SplitConsumer) flush(last bool, scanError bool) error {
 
 func (c *SplitConsumer) close() error {
 	const (
-		isClose = false
+		isClose  = false
 		scanEror = false
 	)
 	return c.flush(isClose, scanEror)
