@@ -1,5 +1,5 @@
-test:
-	cd gotee_test/ && go test -v -p 1 ./...
+include makefile.inc/bin.mk makefile.inc/duration.mk makefile.inc/golang.mk 
 
-test/race:
-	cd gotee_test/ && go test -race -v -p 1 ./...
+all: go/lint go/test go/test/race
+
+test: go/test
