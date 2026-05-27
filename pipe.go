@@ -301,12 +301,12 @@ func (p *pipe) Start() {
 			// Eight. when we have unbuffered writeCh and consumer normal closed
 			// with ErrClosed
 			// In this sitation we can have potential deadlock. We do not set
-			// write error in case when consumer returns ErrClosed and we exit 
+			// write error in case when consumer returns ErrClosed and we exit
 			// from read from writeCh cycle. But stream can send new potion.
 			// In this sitation WriteToPipe forever block on writeCh because
-			// we ended gourutine. In end of read from writeCh cycle we close 
+			// we ended gourutine. In end of read from writeCh cycle we close
 			// endCh. With rule *** we get or correct write or signal that
-			// read cycle ended. If cycle ended we Stop pipe and returns 
+			// read cycle ended. If cycle ended we Stop pipe and returns
 			// that write ended. If we have parallel call Stop from Stream
 			// and WriteToPipe we got correct result error because Stop
 			// have mutex
@@ -349,14 +349,6 @@ func (p *pipe) Start() {
 		return nil
 	}
 
-	isNormalClosed := func(err error) bool {
-		if errors.Is(err, ErrClosed) {
-			return true
-		}
-
-		return false
-	}
-
 	for data := range p.writeCh {
 		err := writeAllToConsumer(data)
 
@@ -364,7 +356,7 @@ func (p *pipe) Start() {
 			continue
 		}
 
-		if !isNormalClosed(err) {
+		if !errors.Is(err, ErrClosed) {
 			sendError = err
 		}
 

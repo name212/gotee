@@ -249,13 +249,13 @@ func NewStreamForCmd(cmd *exec.Cmd, opts ...RunCmdOpt) (*CombineStream, CmdClean
 // - ErrCleanAfterRun - CmdCleaner returned from NewStreamForCmd has error
 // RunCmd func covered with tests in ./gotee_test/exec_test.go
 func RunCmd(ctx context.Context, cmd *exec.Cmd, opts ...RunCmdOpt) (*Results, error) {
-	cloneOpts := make([]RunCmdOpt, len(opts))
-	copy(cloneOpts, opts)
-
 	runCmdAdditionalOptions := []RunCmdOpt{
 		RunCmdWithName(cmd.String()),
 		RunCmdWithCloseWait(200 * time.Millisecond),
 	}
+
+	cloneOpts := make([]RunCmdOpt, 0, len(opts) + len(runCmdAdditionalOptions))
+	cloneOpts = append(cloneOpts, opts...)
 
 	cloneOpts = append(cloneOpts, runCmdAdditionalOptions...)
 
