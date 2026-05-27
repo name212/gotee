@@ -1,14 +1,14 @@
 // Copyright 2026
 // license that can be found in the LICENSE file.
 
-package gotee
+package tee
 
 import (
 	"context"
 	"fmt"
 	"io"
 
-	"github.com/name212/gotee/internal"
+	"github.com/name212/gotee/pkg/internal"
 )
 
 const (
@@ -225,28 +225,3 @@ func CloserBeforeStop(c io.Closer) BeforeStop {
 		_ = c.Close()
 	}
 }
-
-func newStoppedResults() *Results {
-	return &Results{
-		ReadErr:       ErrStreamStopped,
-		ConsumersErrs: make(ConsumersErrors),
-	}
-}
-
-func newAlreadyStartedResults() *Results {
-	return &Results{
-		ReadErr:       ErrStreamAlreadyStarted,
-		ConsumersErrs: make(ConsumersErrors),
-	}
-}
-
-type (
-	noValT   = struct{}
-	stopChan = chan noValT
-	outChan  = chan []byte
-	errChan  = chan error
-)
-
-var (
-	noVal = struct{}{}
-)

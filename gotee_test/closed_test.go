@@ -6,7 +6,7 @@ package gotee_test
 import (
 	"testing"
 
-	tee "github.com/name212/gotee"
+	"github.com/name212/gotee/pkg/tee"
 	"github.com/stretchr/testify/require"
 )
 

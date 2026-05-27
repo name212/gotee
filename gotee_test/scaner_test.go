@@ -15,8 +15,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/name212/gotee"
-	"github.com/name212/gotee/scan"
+	"github.com/name212/gotee/pkg/tee"
+	"github.com/name212/gotee/pkg/scan"
 )
 
 const smallMaxTokenSize = 256 // Much smaller for more efficient testing.
@@ -677,7 +677,7 @@ func TestScanLineTooLong(t *testing.T) {
 		j++
 		lineNum++
 
-		toAdd := gotee.CopyBytes(s)
+		toAdd := tee.CopyBytes(s)
 
 		if len(toAdd) == 0 || len(toAdd) <= scansLen-1 {
 			scans = append(scans, toAdd)
@@ -690,7 +690,7 @@ func TestScanLineTooLong(t *testing.T) {
 			if ll < scansLen {
 				toCopy = ll
 			}
-			b := gotee.CopyBytes(toAdd[0:toCopy])
+			b := tee.CopyBytes(toAdd[0:toCopy])
 			scans = append(scans, b)
 			toAdd = toAdd[toCopy:]
 		}

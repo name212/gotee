@@ -1,11 +1,13 @@
 // Copyright 2026
 // license that can be found in the LICENSE file.
 
-package gotee
+package consumer
 
 import (
 	"bufio"
 	"sync"
+
+	tee "github.com/name212/gotee/pkg/tee"
 )
 
 var (
@@ -31,7 +33,7 @@ type LineHandler interface {
 // and always pass input to Linehandler.
 // Warning! Do not use WithCopyInput(true) to avoid unnecessary allocations!
 func NewLineConsumer(handler LineHandler, name ...string) *SplitConsumer {
-	nameForSet := []string{ConsumerName(1, name...)}
+	nameForSet := []string{tee.ConsumerName(1, name...)}
 	return newLineConsumer(handler, nameForSet...)
 }
 
@@ -41,7 +43,7 @@ func NewLineConsumer(handler LineHandler, name ...string) *SplitConsumer {
 // Can be used for better handle Unhandled bytes last token or scan error
 // You can use WithCopyInput(true) to avoid use internal buffer slices
 func NewCustomLineConsumer(partsHandler PartsHandler, name ...string) *SplitConsumer {
-	nameForSet := []string{ConsumerName(1, name...)}
+	nameForSet := []string{tee.ConsumerName(1, name...)}
 	return NewSplitConsumer(bufio.ScanLines, partsHandler, nameForSet...)
 }
 
@@ -49,7 +51,7 @@ func NewCustomLineConsumer(partsHandler PartsHandler, name ...string) *SplitCons
 // Like as NewConsumer but get function instead interface.
 // Warning! Do not use WithCopyInput(true) to avoid unnecessary allocations!
 func NewFuncLineConsumer(handler FuncStr, name ...string) *SplitConsumer {
-	nameForSet := []string{ConsumerName(1, name...)}
+	nameForSet := []string{tee.ConsumerName(1, name...)}
 	return newLineConsumer(NewFuncLineHandler(handler), nameForSet...)
 }
 
@@ -57,7 +59,7 @@ func NewFuncLineConsumer(handler FuncStr, name ...string) *SplitConsumer {
 // Like as NewConsumer but get function without returnning error instead interface.
 // Warning! Do not use WithCopyInput(true) to avoid unnecessary allocations!
 func NewFuncNoErrLineConsumer(handler FuncStrNoErr, name ...string) *SplitConsumer {
-	nameForSet := []string{ConsumerName(1, name...)}
+	nameForSet := []string{tee.ConsumerName(1, name...)}
 	return newLineConsumer(NewFuncNoErrLineHandler(handler), nameForSet...)
 }
 

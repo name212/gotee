@@ -1,13 +1,17 @@
 // Copyright 2026
 // license that can be found in the LICENSE file.
 
-package gotee
+package consumer
 
-import "io"
+import (
+	"io"
+
+	tee "github.com/name212/gotee/pkg/tee"
+)
 
 var (
-	_ Consumer = &WriteCloserConsumer{}
-	_ Consumer = &WriterConsumer{}
+	_ tee.Consumer = &WriteCloserConsumer{}
+	_ tee.Consumer = &WriterConsumer{}
 )
 
 // WriteCloserConsumer

@@ -11,24 +11,25 @@ import (
 	"testing"
 	"time"
 
-	"github.com/name212/gotee"
+	"github.com/name212/gotee/pkg/tee"
+	"github.com/name212/gotee/pkg/tee/stream"
 	"github.com/stretchr/testify/require"
 )
 
 func TestTeeStreamInterruptFromConsumer(t *testing.T) {
-	enableDebugLogs(t)
+	EnableDebugLogs(t)
 	bufString := `First string
 Second String
 Third string`
-	createBuf := func() *gotee.ClosableReaderBuffer {
+	createBuf := func() *tee.ClosableReaderBuffer {
 		b := bytes.NewBufferString(bufString)
-		return gotee.NewClosableReaderBuffer(b)
+		return tee.NewClosableReaderBuffer(b)
 	}
 
-	createErrConsumer := func(name string, cut string, err error) *testWriteCloserConsumer {
+	createErrConsumer := func(name string, cut string, err error) *TestWriteCloserConsumer {
 		ct := []byte(cut)
 		c := newTestWriteCloserConsumer(name)
-		c.setWriteErrChecker(func(b []byte) ([]byte, error) {
+		c.SetWriteErrChecker(func(b []byte) ([]byte, error) {
 			if bytes.Contains(b, ct) {
 				return ct, err
 			}
@@ -39,20 +40,20 @@ Third string`
 		return c
 	}
 
-	createClosedConsumer := func(name string, cut string) *testWriteCloserConsumer {
-		return createErrConsumer("closed_"+name, cut, gotee.ErrClosed)
+	createClosedConsumer := func(name string, cut string) *TestWriteCloserConsumer {
+		return createErrConsumer("closed_"+name, cut, tee.ErrClosed)
 	}
 
 	ctx := context.TODO()
 
-	assertConsumers := func(t *testing.T, consumers map[*testWriteCloserConsumer]string) {
+	assertConsumers := func(t *testing.T, consumers map[*TestWriteCloserConsumer]string) {
 		for c, expected := range consumers {
-			require.Equal(t, expected, c.content(), "consumer %s should have correct content", c.Name())
+			require.Equal(t, expected, c.Content(), "consumer %s should have correct content", c.Name())
 			require.True(t, c.IsClosed(), "consumer %s should be closed", c.Name())
 		}
 	}
 
-	assertNoErrResults := func(t *testing.T, res *gotee.Results) {
+	assertNoErrResults := func(t *testing.T, res *tee.Results) {
 		require.Nil(t, res, "results should be nil")
 		require.NoError(t, res.GetError(), "results should not get error")
 		require.False(t, res.HasLeastOneError(), "results should not returns least one error")
@@ -60,7 +61,7 @@ Third string`
 		require.False(t, res.HasReadError(), "results should not have read error")
 	}
 
-	assertErrResults := func(t *testing.T, res *gotee.Results, consumersErrs map[string]error) {
+	assertErrResults := func(t *testing.T, res *tee.Results, consumersErrs map[string]error) {
 		require.NotNil(t, res, "results should presents")
 		require.Error(t, res.GetError(), "results should get error")
 		require.Error(t, res, "results should be error")
@@ -76,12 +77,12 @@ Third string`
 		}
 	}
 
-	type streamConstructor func(t *testing.T, r io.Reader, c ...gotee.Consumer) *gotee.TeeStream
+	type streamConstructor func(t *testing.T, r io.Reader, c ...tee.Consumer) *stream.TeeStream
 
-	createAssertionsErrConsumers := func(consumerParams map[string][]string) ([]gotee.Consumer, map[*testWriteCloserConsumer]string, map[string]error) {
-		consumers := make([]gotee.Consumer, 0, len(consumerParams))
+	createAssertionsErrConsumers := func(consumerParams map[string][]string) ([]tee.Consumer, map[*TestWriteCloserConsumer]string, map[string]error) {
+		consumers := make([]tee.Consumer, 0, len(consumerParams))
 
-		consumersToAsserts := make(map[*testWriteCloserConsumer]string)
+		consumersToAsserts := make(map[*TestWriteCloserConsumer]string)
 		consumersErrs := make(map[string]error)
 
 		for name, params := range consumerParams {
@@ -98,11 +99,11 @@ Third string`
 	doAllInterruptedConsumers := func(t *testing.T, constructor streamConstructor) {
 		tests := []struct {
 			name   string
-			assert func(t *testing.T, constructor streamConstructor) *gotee.TeeStream
+			assert func(t *testing.T, constructor streamConstructor) *stream.TeeStream
 		}{
 			{
 				name: "all consumers closed",
-				assert: func(t *testing.T, constructor streamConstructor) *gotee.TeeStream {
+				assert: func(t *testing.T, constructor streamConstructor) *stream.TeeStream {
 					first := createClosedConsumer("mul_all_close_first", "st str")
 					second := createClosedConsumer("mul_all_close_second", "nd S")
 					third := createClosedConsumer("mul_all_close_third", "Third ")
@@ -114,7 +115,7 @@ Third string`
 
 					assertNoErrResults(t, res)
 
-					assertConsumers(t, map[*testWriteCloserConsumer]string{
+					assertConsumers(t, map[*TestWriteCloserConsumer]string{
 						first:  "Fir",
 						second: "First string\nSeco",
 						third:  "First string\nSecond String\n",
@@ -126,7 +127,7 @@ Third string`
 
 			{
 				name: "one consumers closed",
-				assert: func(t *testing.T, constructor streamConstructor) *gotee.TeeStream {
+				assert: func(t *testing.T, constructor streamConstructor) *stream.TeeStream {
 					first := newTestWriteCloserConsumer("mul_one_close_first")
 					second := createClosedConsumer("mul_one_close_closed", "nd S")
 					third := newTestWriteCloserConsumer("mul_one_close_third")
@@ -138,7 +139,7 @@ Third string`
 
 					assertNoErrResults(t, res)
 
-					assertConsumers(t, map[*testWriteCloserConsumer]string{
+					assertConsumers(t, map[*TestWriteCloserConsumer]string{
 						first:  bufString,
 						second: "First string\nSeco",
 						third:  bufString,
@@ -150,7 +151,7 @@ Third string`
 
 			{
 				name: "multiple consumers closed",
-				assert: func(t *testing.T, constructor streamConstructor) *gotee.TeeStream {
+				assert: func(t *testing.T, constructor streamConstructor) *stream.TeeStream {
 					first := newTestWriteCloserConsumer("mul_one_close_first")
 					second := createClosedConsumer("mul_one_close_closed", "nd S")
 					third := createClosedConsumer("mul_one_close_closed", "First")
@@ -162,7 +163,7 @@ Third string`
 
 					assertNoErrResults(t, res)
 
-					assertConsumers(t, map[*testWriteCloserConsumer]string{
+					assertConsumers(t, map[*TestWriteCloserConsumer]string{
 						first:  bufString,
 						second: "First string\nSeco",
 						third:  "",
@@ -174,7 +175,7 @@ Third string`
 
 			{
 				name: "single consumer closed",
-				assert: func(t *testing.T, constructor streamConstructor) *gotee.TeeStream {
+				assert: func(t *testing.T, constructor streamConstructor) *stream.TeeStream {
 					c := createClosedConsumer("one_close_closed", "nd S")
 
 					buf := createBuf()
@@ -184,7 +185,7 @@ Third string`
 
 					assertNoErrResults(t, res)
 
-					assertConsumers(t, map[*testWriteCloserConsumer]string{
+					assertConsumers(t, map[*TestWriteCloserConsumer]string{
 						c: "First string\nSeco",
 					})
 
@@ -194,7 +195,7 @@ Third string`
 
 			{
 				name: "all consumers in error",
-				assert: func(t *testing.T, constructor streamConstructor) *gotee.TeeStream {
+				assert: func(t *testing.T, constructor streamConstructor) *stream.TeeStream {
 					consumers, consumersToAsserts, consumersErrs := createAssertionsErrConsumers(map[string][]string{
 						"mul_all_err_first": {
 							"st str",
@@ -228,7 +229,7 @@ Third string`
 
 			{
 				name: "one consumers in error",
-				assert: func(t *testing.T, constructor streamConstructor) *gotee.TeeStream {
+				assert: func(t *testing.T, constructor streamConstructor) *stream.TeeStream {
 					consumers, consumersToAsserts, consumersErrs := createAssertionsErrConsumers(map[string][]string{
 						"mul_one_err": {
 							"t str",
@@ -260,7 +261,7 @@ Third string`
 
 			{
 				name: "multiple consumers in error",
-				assert: func(t *testing.T, constructor streamConstructor) *gotee.TeeStream {
+				assert: func(t *testing.T, constructor streamConstructor) *stream.TeeStream {
 					consumers, consumersToAsserts, consumersErrs := createAssertionsErrConsumers(map[string][]string{
 						"mul_mul_err_first": {
 							"t str",
@@ -294,7 +295,7 @@ Third string`
 
 			{
 				name: "single consumer in error",
-				assert: func(t *testing.T, constructor streamConstructor) *gotee.TeeStream {
+				assert: func(t *testing.T, constructor streamConstructor) *stream.TeeStream {
 					consumers, consumersToAsserts, consumersErrs := createAssertionsErrConsumers(map[string][]string{
 						"one_err": {
 							"rd",
@@ -318,7 +319,7 @@ Third string`
 
 			{
 				name: "one consumer in error anothers closed",
-				assert: func(t *testing.T, constructor streamConstructor) *gotee.TeeStream {
+				assert: func(t *testing.T, constructor streamConstructor) *stream.TeeStream {
 					consumers, consumersToAsserts, consumersErrs := createAssertionsErrConsumers(map[string][]string{
 						"mixed_one_err_err": {
 							"\nSecond",
@@ -350,7 +351,7 @@ Third string`
 
 			{
 				name: "one consumer closed anothers in error",
-				assert: func(t *testing.T, constructor streamConstructor) *gotee.TeeStream {
+				assert: func(t *testing.T, constructor streamConstructor) *stream.TeeStream {
 					consumers, consumersToAsserts, consumersErrs := createAssertionsErrConsumers(map[string][]string{
 						"mixed_one_closed_err_first": {
 							"g\nSecond",
@@ -387,7 +388,7 @@ Third string`
 			t.Run(tst.name, func(t *testing.T) {
 				stream := tst.assert(t, constructor)
 				assertNoReadGourutine(t, stream)
-				assertNoTeeGorutines(t, nil)
+				AssertNoTeeGorutines(t, nil)
 			})
 		}
 	}
@@ -398,8 +399,8 @@ Third string`
 	}{
 		{
 			name: "Small read buffer",
-			constructor: func(t *testing.T, r io.Reader, c ...gotee.Consumer) *gotee.TeeStream {
-				stream, err := gotee.NewTeeStream(r, c...)
+			constructor: func(t *testing.T, r io.Reader, c ...tee.Consumer) *stream.TeeStream {
+				stream, err := stream.NewTeeStream(r, c...)
 				require.NoError(t, err, "stream should created")
 				stream.WithName("small")
 				stream.WithReadBufSize(1)
@@ -410,8 +411,8 @@ Third string`
 
 		{
 			name: "Small read buffer and unbuffered write",
-			constructor: func(t *testing.T, r io.Reader, c ...gotee.Consumer) *gotee.TeeStream {
-				stream, err := gotee.NewTeeStream(r, c...)
+			constructor: func(t *testing.T, r io.Reader, c ...tee.Consumer) *stream.TeeStream {
+				stream, err := stream.NewTeeStream(r, c...)
 				require.NoError(t, err, "stream should created")
 				stream.WithName("small unbuf")
 				stream.WithReadBufSize(1)
@@ -423,8 +424,8 @@ Third string`
 
 		{
 			name: "Big read buffer",
-			constructor: func(t *testing.T, r io.Reader, c ...gotee.Consumer) *gotee.TeeStream {
-				stream, err := gotee.NewTeeStream(r, c...)
+			constructor: func(t *testing.T, r io.Reader, c ...tee.Consumer) *stream.TeeStream {
+				stream, err := stream.NewTeeStream(r, c...)
 				require.NoError(t, err, "stream should created")
 				stream.WithName("big")
 				stream.WithReadBufSize(64 * 1024)
@@ -435,8 +436,8 @@ Third string`
 
 		{
 			name: "Big read buffer and unbuffered write",
-			constructor: func(t *testing.T, r io.Reader, c ...gotee.Consumer) *gotee.TeeStream {
-				stream, err := gotee.NewTeeStream(r, c...)
+			constructor: func(t *testing.T, r io.Reader, c ...tee.Consumer) *stream.TeeStream {
+				stream, err := stream.NewTeeStream(r, c...)
 				require.NoError(t, err, "stream should created")
 				stream.WithName("big unbuf")
 				stream.WithReadBufSize(64 * 1024)
@@ -455,18 +456,18 @@ Third string`
 }
 
 func TestTeeStreamStop(t *testing.T) {
-	enableDebugLogs(t)
+	EnableDebugLogs(t)
 	bufString := `First string
 Second String
 Third string`
 
 	t.Run("Stop stream before read all", func(t *testing.T) {
-		reader := newTestReader(bufString)
-		reader.withSleep(2 * time.Second)
+		reader := NewTestReader(bufString)
+		reader.WithSleep(2 * time.Second)
 
 		c := newTestWriteCloserConsumer("not_full")
 
-		stream, err := gotee.NewTeeStream(reader, c)
+		stream, err := stream.NewTeeStream(reader, c)
 		require.NoError(t, err, "stream should created")
 		stream.WithName("rstop_before_read")
 		stream.WithReadBufSize(1)
@@ -480,19 +481,19 @@ Third string`
 		res := stream.Run(context.TODO())
 		require.Nil(t, res, "results should nil")
 		assertNoReadGourutine(t, stream)
-		assertNoTeeGorutines(t, nil)
+		AssertNoTeeGorutines(t, nil)
 	})
 
 }
 
-func addClosableBufferToStream(s *gotee.TeeStream, r io.Reader) {
-	bc, ok := r.(*gotee.ClosableReaderBuffer)
+func addClosableBufferToStream(s *stream.TeeStream, r io.Reader) {
+	bc, ok := r.(*tee.ClosableReaderBuffer)
 	if ok {
-		s.WithBeforeStop(gotee.CloserBeforeStop(bc))
+		s.WithBeforeStop(tee.CloserBeforeStop(bc))
 	}
 }
 
-func assertNoReadGourutine(t *testing.T, s *gotee.TeeStream) {
+func assertNoReadGourutine(t *testing.T, s *stream.TeeStream) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
 	defer cancel()
 	start := time.Now().UnixNano()

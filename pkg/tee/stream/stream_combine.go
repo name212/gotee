@@ -1,33 +1,34 @@
 // Copyright 2026
 // license that can be found in the LICENSE file.
 
-package gotee
+package stream
 
 import (
 	"context"
 	"fmt"
 	"sync"
 
-	"github.com/name212/gotee/internal"
+	"github.com/name212/gotee/pkg/internal"
+	tee "github.com/name212/gotee/pkg/tee"
 )
 
-var _ Stream = &CombineStream{}
+var _ tee.Stream = &CombineStream{}
 
 // CombineStream
 // combine all passed streams to one stream
 type CombineStream struct {
 	*baseStream
-	streams []Stream
+	streams []tee.Stream
 }
 
-func NewCombineStream(streams ...Stream) (*CombineStream, error) {
+func NewCombineStream(streams ...tee.Stream) (*CombineStream, error) {
 	if len(streams) == 0 {
 		return nil, fmt.Errorf("no passed streams to combine stream")
 	}
 
 	return &CombineStream{
 		baseStream: newBaseStream(),
-		streams:    append([]Stream{}, streams...),
+		streams:    append([]tee.Stream{}, streams...),
 	}, nil
 }
 
@@ -38,20 +39,20 @@ func NewCombineStream(streams ...Stream) (*CombineStream, error) {
 // Results.ConsumersErrs contains all errors from all consumes
 // for each Stream
 // if not receive read error and all consumers not have errors returns nil Results
-func (s *CombineStream) Run(ctx context.Context) *Results {
+func (s *CombineStream) Run(ctx context.Context) *tee.Results {
 	if s.isStopped() {
 		return newStoppedResults()
 	}
 
 	streamsCount := len(s.streams)
 
-	results := make([]Results, streamsCount)
+	results := make([]tee.Results, streamsCount)
 
 	wg := sync.WaitGroup{}
 	wg.Add(streamsCount)
 
 	for i, curStream := range s.streams {
-		go func(indx int, stream Stream) {
+		go func(indx int, stream tee.Stream) {
 			defer wg.Done()
 
 			res := stream.Run(ctx)
@@ -68,7 +69,7 @@ func (s *CombineStream) Run(ctx context.Context) *Results {
 	s.Stop()
 
 	var resReadErr error
-	resConsumersErrors := make(ConsumersErrors)
+	resConsumersErrors := make(tee.ConsumersErrors)
 
 	for i, res := range results {
 		if res.ReadErr != nil {
@@ -86,7 +87,7 @@ func (s *CombineStream) Run(ctx context.Context) *Results {
 		}
 	}
 
-	r := &Results{
+	r := &tee.Results{
 		ReadErr:       resReadErr,
 		ConsumersErrs: resConsumersErrors,
 	}
@@ -139,13 +140,13 @@ func (s *CombineStream) WaitReadEnd(ctx context.Context) error {
 	for i, strm := range s.streams {
 		wg.Add(1)
 
-		go func(indx int, st Stream) {
+		go func(indx int, st tee.Stream) {
 			defer wg.Done()
 			appendErr(indx, st.WaitReadEnd(ctx))
 		}(i, strm)
 	}
 
-	allDone := make(stopChan)
+	allDone := make(internal.StopChan)
 
 	go func() {
 		wg.Wait()

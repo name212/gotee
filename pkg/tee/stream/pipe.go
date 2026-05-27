@@ -1,25 +1,26 @@
 // Copyright 2026
 // license that can be found in the LICENSE file.
 
-package gotee
+package stream
 
 import (
 	"errors"
 	"fmt"
 	"sync"
 
-	"github.com/name212/gotee/internal"
+	"github.com/name212/gotee/pkg/internal"
+	tee "github.com/name212/gotee/pkg/tee"
 )
 
 type pipe struct {
-	consumer Consumer
+	consumer tee.Consumer
 
-	writeCh outChan
+	writeCh internal.OutChan
 	// end channel needs for
 	// waiting that all data will write
-	endCh stopChan
+	endCh internal.StopChan
 
-	stopped *ClosedFlag
+	stopped *tee.ClosedFlag
 
 	writeErrMu sync.RWMutex
 	writeErr   error
@@ -30,19 +31,19 @@ type pipe struct {
 	resultErr error
 }
 
-func newPipe(consumer Consumer, writesCount int) *pipe {
-	var writeCh outChan
+func newPipe(consumer tee.Consumer, writesCount int) *pipe {
+	var writeCh internal.OutChan
 	if writesCount > 0 {
-		writeCh = make(outChan, writesCount)
+		writeCh = make(internal.OutChan, writesCount)
 	} else {
-		writeCh = make(outChan)
+		writeCh = make(internal.OutChan)
 	}
 
 	return &pipe{
-		endCh:    make(stopChan, 2),
+		endCh:    make(internal.StopChan, 2),
 		writeCh:  writeCh,
 		consumer: consumer,
-		stopped:  NewClosedFlag(),
+		stopped:  tee.NewClosedFlag(),
 	}
 }
 
@@ -356,7 +357,7 @@ func (p *pipe) Start() {
 			continue
 		}
 
-		if !errors.Is(err, ErrClosed) {
+		if !errors.Is(err, tee.ErrClosed) {
 			sendError = err
 		}
 

@@ -16,23 +16,23 @@ import (
 	"testing"
 	"time"
 
-	"github.com/name212/gotee"
-	tee "github.com/name212/gotee"
+	tee "github.com/name212/gotee/pkg/tee"
+	"github.com/name212/gotee/pkg/tee/consumer"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	_ tee.Consumer   = &testWriteCloserConsumer{}
-	_ io.WriteCloser = &testWriteCloser{}
-	_ io.Writer      = &testWriteCloser{}
+	_ tee.Consumer   = &TestWriteCloserConsumer{}
+	_ io.WriteCloser = &TestWriteCloser{}
+	_ io.Writer      = &TestWriteCloser{}
 )
 
 var (
 	testsBaseDir = filepath.Join(os.TempDir(), "tests-go-tee")
 )
 
-type testWriteCloserConsumer struct {
-	*tee.BaseConsumer
+type TestWriteCloserConsumer struct {
+	*consumer.BaseConsumer
 
 	mu                sync.Mutex
 	buf               *bytes.Buffer
@@ -41,17 +41,17 @@ type testWriteCloserConsumer struct {
 	closeErr          error
 }
 
-func newTestWriteCloserConsumer(name string) *testWriteCloserConsumer {
-	c := &testWriteCloserConsumer{
+func newTestWriteCloserConsumer(name string) *TestWriteCloserConsumer {
+	c := &TestWriteCloserConsumer{
 		buf: &bytes.Buffer{},
 	}
 
-	c.BaseConsumer = tee.NewBaseConsumer(name, c.write, c.close)
+	c.BaseConsumer = consumer.NewBaseConsumer(name, c.write, c.close)
 
 	return c
 }
 
-func (c *testWriteCloserConsumer) write(p []byte) (int, error) {
+func (c *TestWriteCloserConsumer) write(p []byte) (int, error) {
 	c.checkErr(p)
 
 	if err := c.getWriteErr(); err != nil {
@@ -64,38 +64,38 @@ func (c *testWriteCloserConsumer) write(p []byte) (int, error) {
 	return c.buf.Write(p)
 }
 
-func (c *testWriteCloserConsumer) close() error {
+func (c *TestWriteCloserConsumer) close() error {
 	return c.getCloseErr()
 }
 
-func (c *testWriteCloserConsumer) content() string {
+func (c *TestWriteCloserConsumer) Content() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	return c.buf.String()
 }
 
-func (c *testWriteCloserConsumer) getWriteErr() error {
+func (c *TestWriteCloserConsumer) getWriteErr() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	return c.writeErr
 }
 
-func (c *testWriteCloserConsumer) setWriteErr(err error) {
+func (c *TestWriteCloserConsumer) setWriteErr(err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.writeErr = err
 }
 
-func (c *testWriteCloserConsumer) checkErr(input []byte) {
+func (c *TestWriteCloserConsumer) checkErr(input []byte) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.writeErrorChecker != nil {
 		bt := c.buf.Bytes()
-		bt = gotee.CopyBytes(bt)
+		bt = tee.CopyBytes(bt)
 		bt = append(bt, input...)
 		if cut, err := c.writeErrorChecker(bt); err != nil {
 			c.buf.Write(input)
@@ -109,46 +109,46 @@ func (c *testWriteCloserConsumer) checkErr(input []byte) {
 	}
 }
 
-func (c *testWriteCloserConsumer) setWriteErrChecker(ch func([]byte) ([]byte, error)) {
+func (c *TestWriteCloserConsumer) SetWriteErrChecker(ch func([]byte) ([]byte, error)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.writeErrorChecker = ch
 }
 
-func (c *testWriteCloserConsumer) getCloseErr() error {
+func (c *TestWriteCloserConsumer) getCloseErr() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	return c.closeErr
 }
 
-func (c *testWriteCloserConsumer) setCloseErr(err error) {
+func (c *TestWriteCloserConsumer) setCloseErr(err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.closeErr = err
 }
 
-type testWriteCloser struct {
-	base *testWriteCloserConsumer
+type TestWriteCloser struct {
+	base *TestWriteCloserConsumer
 }
 
-func newTestWriteCloser() *testWriteCloser {
-	return &testWriteCloser{
+func NewTestWriteCloser() *TestWriteCloser {
+	return &TestWriteCloser{
 		base: newTestWriteCloserConsumer(""),
 	}
 }
 
-func (c *testWriteCloser) Write(p []byte) (int, error) {
+func (c *TestWriteCloser) Write(p []byte) (int, error) {
 	return c.base.Write(p)
 }
 
-func (c *testWriteCloser) Close() error {
+func (c *TestWriteCloser) Close() error {
 	return c.base.Close()
 }
 
-type testReader struct {
+type TestReader struct {
 	buf            *tee.ClosableReaderBuffer
 	sleepTime      time.Duration
 	maxReadSymbols int
@@ -158,32 +158,32 @@ type testReader struct {
 	readed         int
 }
 
-func newTestReader(content string) *testReader {
+func NewTestReader(content string) *TestReader {
 	buf := bytes.NewBufferString(content)
-	return &testReader{
+	return &TestReader{
 		buf:            tee.NewClosableReaderBuffer(buf),
 		maxReadSymbols: -1,
 		failAfter:      -1,
 	}
 }
 
-func (r *testReader) withSleep(t time.Duration) *testReader {
+func (r *TestReader) WithSleep(t time.Duration) *TestReader {
 	r.sleepTime = t
 	return r
 }
 
-func (r *testReader) withMaxSymbols(s int) *testReader {
+func (r *TestReader) WithMaxSymbols(s int) *TestReader {
 	r.maxReadSymbols = s
 	return r
 }
 
-func (r *testReader) withFailAfter(a int, err error) *testReader {
+func (r *TestReader) WithFailAfter(a int, err error) *TestReader {
 	r.failAfter = a
 	r.failErr = err
 	return r
 }
 
-func (r *testReader) Read(p []byte) (int, error) {
+func (r *TestReader) Read(p []byte) (int, error) {
 	if r.sleepTime > 0 {
 		time.Sleep(r.sleepTime)
 	}
@@ -214,11 +214,11 @@ func (r *testReader) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-func (b *testReader) Close() error {
+func (b *TestReader) Close() error {
 	return b.buf.Close()
 }
 
-func randString(seed string) string {
+func RandString(seed string) string {
 	n := rand.NewSource(time.Now().UnixNano()).Int63()
 
 	all := fmt.Sprintf("%s%d", seed, n)
@@ -230,11 +230,11 @@ func randString(seed string) string {
 	return fmt.Sprintf("%.10s", res)
 }
 
-func writeScript(t *testing.T, name, content string) string {
+func WriteScript(t *testing.T, name, content string) string {
 	err := os.MkdirAll(testsBaseDir, 0o777)
 	require.NoError(t, err, "base tests dir %s should create", testsBaseDir)
 
-	randStr := randString(content)
+	randStr := RandString(content)
 
 	fullName := fmt.Sprintf(
 		"%s.%s.sh",
@@ -250,12 +250,12 @@ func writeScript(t *testing.T, name, content string) string {
 	return fullPath
 }
 
-func enableDebugLogs(t *testing.T) {
+func EnableDebugLogs(t *testing.T) {
 	t.Setenv("GO_TEE_ENABLE_DEBUG_LOG", "true")
 	t.Setenv("GO_TEE_DEBUG_LOG_FULL_BUFF", "true")
 }
 
-func assertNoTeeGorutines(t *testing.T, additionals map[string]string) {
+func AssertNoTeeGorutines(t *testing.T, additionals map[string]string) {
 	t.Log("wait 100 ms before assert call stack...")
 	time.Sleep(100 * time.Millisecond)
 

@@ -1,13 +1,15 @@
 // Copyright 2026
 // license that can be found in the LICENSE file.
 
-package gotee
+package consumer
 
 import (
 	"bytes"
+
+	tee "github.com/name212/gotee/pkg/tee"
 )
 
-var _ Consumer = &BufferConsumer{}
+var _ tee.Consumer = &BufferConsumer{}
 
 // BufferConsumer
 // Consume all writes to bytes.Buffer
