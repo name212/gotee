@@ -18,6 +18,7 @@ jobs:
         uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
+          submodules: "true"
           ref: ${{ github.event.pull_request.head.sha }}
       - &setup_go
         name: Setup Go
@@ -36,7 +37,7 @@ jobs:
       - *checkout_step
       - *setup_go
       - name: Run no tidy
-        run: make go/ci/check/no-tidy
+        run: make go/check/no-tidy
 
   run_tests:
     name: "Run unit tests"
