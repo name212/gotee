@@ -36,7 +36,7 @@ jobs:
       - *checkout_step
       - *setup_go
       - name: Run no tidy
-        run: make go/ci/check/no-tidy
+        run: make go/check/no-tidy
 
   run_tests:
     name: "Run unit tests"
