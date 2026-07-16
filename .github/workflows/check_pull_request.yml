@@ -17,6 +17,7 @@ jobs:
       uses: name212/action-dynamic-uses@dc77a3349fecbd50c85ee651868ac03444af877a # v3
       with:
         uses: 'dir:makefile-go/.github/actions/test'
+        checkout_ref: ${{ github.event.pull_request.head.sha }}
         with: |
           run_race_tests: "with_tests"
           parallel_tests: "false"
