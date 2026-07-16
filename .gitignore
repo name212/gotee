@@ -32,5 +32,6 @@ go.work.sum
 .vscode/
 
 bin/
-tmp/
-*.json.test.result
+build/
+*.tst.res
+tmp-go-tests/
