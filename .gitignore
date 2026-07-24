@@ -32,6 +32,7 @@ go.work.sum
 .vscode/
 
 bin/
-build/
-*.tst.res
+.build/
+.release/
 tmp-go-tests/
+*.tst.res
