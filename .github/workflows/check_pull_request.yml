@@ -7,17 +7,17 @@ on:
       - reopened
 
 jobs:
-  lint:
-    name: "Lint and tets"
+  tests:
+    name: "Lint and tests"
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-    - name: Run action
+    - name: Run test action
       uses: name212/action-dynamic-uses@dc77a3349fecbd50c85ee651868ac03444af877a # v3
       with:
         uses: 'dir:makefile-go/.github/actions/test'
         checkout_ref: ${{ github.event.pull_request.head.sha }}
         with: |
+          tests_parallelism: "false"
           run_race_tests: "with_tests"
-          parallel_tests: "false"
