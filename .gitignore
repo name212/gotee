@@ -31,8 +31,8 @@ go.work.sum
 .idea/
 .vscode/
 
-bin/
+.bin/
 .build/
 .release/
-tmp-go-tests/
+.tmp-go-tests/
 *.tst.res
